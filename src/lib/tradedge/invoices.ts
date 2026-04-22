@@ -9,13 +9,18 @@ export function buildReferenceId() {
 }
 
 export function deriveBuyerEmail(buyerName: string, referenceId: string) {
+  const domain = "@sandbox.tradedge.app";
+  const suffix = `-${referenceId.toLowerCase()}`;
+  const maxEmailLength = 50;
+  const maxSlugLength = Math.max(1, maxEmailLength - domain.length - suffix.length);
+
   const slug = buyerName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
-    .slice(0, 24);
+    .slice(0, maxSlugLength);
 
-  return `${slug || "buyer"}-${referenceId.toLowerCase()}@sandbox.tradedge.app`;
+  return `${slug || "buyer"}${suffix}${domain}`;
 }
 
 export function derivePayoutAmountInr(amountUsd: number) {

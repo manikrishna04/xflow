@@ -52,3 +52,22 @@ export const depositInputSchema = z.object({
   statementDescriptor: z.string().trim().max(255).optional(),
   metadata: z.record(z.string(), metadataString).optional(),
 });
+
+export const createPartnerAccountSchema = z.object({
+  exporterAccountId: z.string().trim().min(1),
+  business_details: z.object({
+    email: z.string().email().max(50, "Email must be 50 characters or fewer."),
+    legal_name: z.string().trim().min(1),
+    physical_address: z.object({
+      city: z.string().trim().min(1),
+      country: z.string().trim().min(1),
+      line1: z.string().trim().min(1),
+      postal_code: z.string().trim().min(1),
+      state: z.string().trim().min(1),
+    }),
+    type: z.enum(["company", "individual"]),
+  }),
+  nickname: z.string().trim().min(1),
+  type: z.literal("partner"),
+  metadata: z.record(z.string(), metadataString).optional(),
+});

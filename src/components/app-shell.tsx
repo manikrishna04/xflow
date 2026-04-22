@@ -8,6 +8,7 @@ import {
   LogOut,
   PlusCircle,
   ShieldEllipsis,
+  Users,
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -22,6 +23,7 @@ const navigationItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/onboarding", icon: ShieldEllipsis, label: "Onboarding" },
   { href: "/invoices", icon: FileText, label: "Invoices" },
+  { href: "/partners", icon: Users, label: "Partners" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -37,6 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith("/invoices/new")) return "Issue a USD receivable";
     if (pathname.startsWith("/invoices/")) return "Invoice control room";
     if (pathname.startsWith("/invoices")) return "Receivables ledger";
+    if (pathname.startsWith("/partners")) return "Partners";
 
     return "Connected exporter workspace";
   }, [pathname]);
