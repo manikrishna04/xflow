@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { ready } = useAuthGuard();
   const exporter = useTradEdgeStore((state) => state.exporter);
-  const sessionEmail = useTradEdgeStore((state) => state.session.email);
+  const sessionAccountId = useTradEdgeStore((state) => state.session.email);
   const signOut = useTradEdgeStore((state) => state.signOut);
 
   const pageTitle = useMemo(() => {
@@ -42,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   if (!ready) {
-    return <WorkspaceLoader label="Checking your mock session and restoring local invoice data." />;
+    return <WorkspaceLoader label="Checking your connected-user session and restoring local invoice data." />;
   }
 
   return (
@@ -92,9 +92,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="mt-auto rounded-[24px] border border-black/8 bg-white/70 p-5">
           <p className="text-xs uppercase tracking-[0.2em] text-foreground/45">
-            Mock Access
+            Connected User Session
           </p>
-          <p className="mt-2 text-sm font-semibold text-foreground">{sessionEmail}</p>
+          <p className="mt-2 text-sm font-semibold text-foreground">{sessionAccountId}</p>
           <Button
             variant="ghost"
             className="mt-4 h-10 w-full justify-start px-0 text-foreground/72"

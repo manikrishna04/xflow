@@ -11,9 +11,11 @@ import { WorkspaceLoader } from "@/components/workspace-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/api-client";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
-import { loginSchema } from "@/lib/tradedge/schemas";
 import { useTradEdgeStore } from "@/lib/store/tradedge-store";
+import { accountIdLoginSchema } from "@/lib/tradedge/schemas";
+import type { ConnectedUserSnapshot } from "@/types/tradedge";
 
 const flowSteps = [
   "1. Complete the connected-user onboarding flow on behalf of the exporter.",
@@ -26,12 +28,15 @@ export function LoginScreen() {
   const router = useRouter();
   const hydrated = useHydrated();
   const isAuthenticated = useTradEdgeStore((state) => state.session.isAuthenticated);
+  const clearWorkspace = useTradEdgeStore((state) => state.clearWorkspace);
   const signIn = useTradEdgeStore((state) => state.signIn);
+  const setExporter = useTradEdgeStore((state) => state.setExporter);
   const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStartingFresh, setIsStartingFresh] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    email: "exporter@tradedge.app",
-    password: "demopass",
+    accountId: "account_F0A_1776834172534_lG9kl_000",
   });
 
   const redirectToDashboard = useEffectEvent(() => {
@@ -44,8 +49,65 @@ export function LoginScreen() {
     }
   }, [hydrated, isAuthenticated]);
 
+  async function handleSubmit() {
+    setError("");
+
+    const parsed = accountIdLoginSchema.safeParse(form);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Enter a valid Xflow account id.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const snapshot = await apiRequest<ConnectedUserSnapshot>(
+        `/api/xflow/account/${encodeURIComponent(parsed.data.accountId)}`,
+      );
+
+      setExporter({
+        accountId: snapshot.account.id,
+        countryCode: snapshot.account.business_details?.physical_address?.country || "IN",
+        createdAt: snapshot.account.created
+          ? new Date(snapshot.account.created * 1000).toISOString()
+          : new Date().toISOString(),
+        dba: snapshot.account.business_details?.dba ?? null,
+        email: snapshot.account.business_details?.email || "",
+        legalName: snapshot.account.business_details?.legal_name || snapshot.account.id,
+        lastSyncedAt: new Date().toISOString(),
+        status: snapshot.account.status ?? null,
+      });
+      signIn(snapshot.account.id);
+      toast.success("Connected-user workspace restored. Opening the dashboard.");
+      startTransition(() => {
+        router.replace("/dashboard");
+      });
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not validate that connected-user account.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleStartWithoutAccount() {
+    setError("");
+    setIsStartingFresh(true);
+    clearWorkspace();
+    signIn("Onboarding session");
+    toast.success("Workspace opened without an account id. Continue from onboarding.");
+    startTransition(() => {
+      router.replace("/dashboard");
+    });
+  }
+
   if (hydrated && isAuthenticated) {
-    return <WorkspaceLoader label="You already have a mock session, so we are taking you to the dashboard." />;
+    return (
+      <WorkspaceLoader label="You already have a connected-user session, so we are taking you to the dashboard." />
+    );
   }
 
   return (
@@ -64,12 +126,10 @@ export function LoginScreen() {
               Run the buyer to receivable to payout flow without ever exposing your Xflow key.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 text-foreground/72">
-              This demo is built for the connected exporter context only. It keeps
-              the secret on Next.js server routes, persists invoices locally, and
-              gives you a clean sandbox surface for receivables, payment
-              instructions, and INR payout tracking. The onboarding flow now
-              collects the full connected-user profile up front before the
-              transaction journey begins.
+              This demo is built for the connected exporter context only. It keeps the
+              secret on Next.js server routes, persists invoices locally, and gives
+              you a clean sandbox surface for receivables, payment instructions, and
+              INR payout tracking.
             </p>
           </div>
 
@@ -94,9 +154,8 @@ export function LoginScreen() {
                 </p>
               </div>
               <p className="mt-3 text-sm leading-7 text-foreground/70">
-                No platform dashboard, wallet orchestration, or custom backend.
-                Just exporter onboarding, buyer creation, receivable issue, and
-                payout tracking.
+                Sign in with a real connected-user account id and pick up that
+                exporter workspace immediately.
               </p>
             </div>
           </div>
@@ -131,48 +190,27 @@ export function LoginScreen() {
             className="w-full"
             onSubmit={(event) => {
               event.preventDefault();
-              setError("");
-
-              const parsed = loginSchema.safeParse(form);
-              if (!parsed.success) {
-                setError(parsed.error.issues[0]?.message || "Enter valid credentials.");
-                return;
-              }
-
-              signIn(parsed.data.email);
-              toast.success("Mock session ready. Opening the dashboard.");
-              startTransition(() => {
-                router.replace("/dashboard");
-              });
+              void handleSubmit();
             }}
           >
-            <p className="data-kicker">Mock Auth</p>
+            <p className="data-kicker">Account Access</p>
             <h2 className="mt-3 text-3xl font-semibold text-foreground">
               Sign in to the exporter console
             </h2>
             <p className="mt-3 text-sm leading-7 text-foreground/68">
-              This is frontend-only auth. The session lives in local storage so you
-              can move through the demo flow without adding a backend.
+              Enter a connected-user account id. We will validate it through our
+              server route, restore that exporter workspace, and keep the session in
+              local storage for the demo flow.
             </p>
 
             <div className="mt-8">
-              <Label htmlFor="email">Work email</Label>
+              <Label htmlFor="accountId">Connected User Account ID</Label>
               <Input
-                id="email"
-                type="email"
-                value={form.email}
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              />
-            </div>
-
-            <div className="mt-5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={form.password}
+                id="accountId"
+                placeholder="account_F0A_..."
+                value={form.accountId}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, password: event.target.value }))
+                  setForm((current) => ({ ...current, accountId: event.target.value }))
                 }
               />
             </div>
@@ -183,17 +221,46 @@ export function LoginScreen() {
               </p>
             ) : null}
 
-            <Button type="submit" size="lg" className="mt-8 w-full" disabled={isPending}>
-              Continue to Dashboard
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-8 w-full"
+              disabled={isSubmitting || isStartingFresh || isPending}
+            >
+              {isSubmitting ? "Validating account..." : "Continue to Dashboard"}
               <ArrowRight className="h-4 w-4" />
             </Button>
 
+            <div className="mt-4 rounded-[22px] border border-black/8 bg-white/78 px-4 py-4 text-sm leading-7 text-foreground/68">
+              This does not ask for a password. It checks that the connected-user
+              account exists and then loads that exporter into the workspace.
+            </div>
+
+            <div className="mt-5 rounded-[28px] bg-[rgba(15,150,136,0.08)] p-5">
+              <p className="text-sm font-semibold text-foreground">Do not have an account id yet?</p>
+              <p className="mt-2 text-sm leading-7 text-foreground/68">
+                Open the dashboard without a connected-user account and complete
+                onboarding there. The workspace will start fresh and create the
+                account during onboarding.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4 w-full"
+                onClick={handleStartWithoutAccount}
+                disabled={isSubmitting || isStartingFresh || isPending}
+              >
+                {isStartingFresh ? "Opening onboarding workspace..." : "Continue Without Account ID"}
+              </Button>
+            </div>
+
             <div className="mt-8 rounded-[28px] bg-[rgba(19,33,68,0.04)] p-5 text-sm leading-7 text-foreground/68">
               Suggested demo sequence:
-              <div>Complete connected-user onboarding in Onboarding.</div>
+              <div>Sign in with the connected-user account id.</div>
+              <div>Or continue without one and create it from onboarding.</div>
+              <div>Review onboarding status in Onboarding.</div>
               <div>Create a buyer receivable from Invoices.</div>
               <div>Use the buyer pay page and then simulate payment.</div>
-              <div>Trigger the INR payout once the receivable is paid.</div>
             </div>
           </form>
         </motion.section>

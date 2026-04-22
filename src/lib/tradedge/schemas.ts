@@ -18,9 +18,14 @@ export const merchantSizeSchema = z.enum(["small", "medium", "large", "enterpris
   message: "Select merchant size.",
 });
 
-export const loginSchema = z.object({
-  email: z.email("Enter a valid work email."),
-  password: z.string().trim().min(6, "Use at least 6 characters."),
+export const accountIdLoginSchema = z.object({
+  accountId: z
+    .string()
+    .trim()
+    .regex(
+      /^account_[A-Za-z0-9_]+$/,
+      "Enter a valid Xflow account id.",
+    ),
 });
 
 export const exporterAccountSchema = z.object({

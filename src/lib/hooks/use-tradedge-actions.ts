@@ -283,6 +283,7 @@ export function useActivateConnectedUserMutation(accountId?: string | null) {
 export function useCompleteConnectedUserOnboardingMutation(accountId?: string | null) {
   const queryClient = useQueryClient();
   const setExporter = useTradEdgeStore((state) => state.setExporter);
+  const signIn = useTradEdgeStore((state) => state.signIn);
 
   return useMutation({
     mutationFn: (input: {
@@ -365,6 +366,7 @@ export function useCompleteConnectedUserOnboardingMutation(accountId?: string | 
         lastSyncedAt: new Date().toISOString(),
         status: snapshot.account.status ?? null,
       });
+      signIn(snapshot.account.id);
 
       queryClient.setQueryData(["connected-user", snapshot.account.id], snapshot);
       void queryClient.invalidateQueries({

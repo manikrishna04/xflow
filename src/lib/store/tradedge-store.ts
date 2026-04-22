@@ -50,10 +50,10 @@ export const useTradEdgeStore = create<TradEdgeStore>()(
           invoices: state.invoices.filter((invoice) => invoice.id !== invoiceId),
         })),
       setExporter: (exporter) => set(() => ({ exporter })),
-      signIn: (email) =>
+      signIn: (accountId) =>
         set(() => ({
           session: {
-            email,
+            email: accountId,
             isAuthenticated: true,
           },
         })),
