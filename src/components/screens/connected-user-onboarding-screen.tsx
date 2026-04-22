@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -248,6 +248,7 @@ export function ConnectedUserOnboardingScreen({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState("");
   const [formData, setFormData] = useState<OnboardingFormData>(() => mergeInitialData(initialData));
+  const submitLockRef = useRef(false);
   const purposeCodesQuery = usePurposeCodesQuery();
   const purposeCodeOptions = purposeCodesQuery.data ?? [];
   const recommendedPurposeCodeSet = new Set<string>(
@@ -346,12 +347,20 @@ export function ConnectedUserOnboardingScreen({
       return;
     }
 
+    if (isLoading || submitLockRef.current) {
+      return;
+    }
+
+    submitLockRef.current = true;
+
     try {
       await onSubmit(result.data);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Could not submit connected-user onboarding.",
       );
+    } finally {
+      submitLockRef.current = false;
     }
   };
 

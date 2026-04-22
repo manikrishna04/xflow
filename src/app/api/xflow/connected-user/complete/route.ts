@@ -10,7 +10,7 @@ import {
   validateCompanyPersonnelRequirement,
 } from "@/lib/tradedge/onboarding";
 import { multiStepOnboardingSchema } from "@/lib/tradedge/schemas";
-import { getXflowAccount } from "@/lib/xflow/accounts";
+import { findReusableConnectedUserAccount, getXflowAccount } from "@/lib/xflow/accounts";
 import { xflowRequest } from "@/lib/xflow/client";
 import { xflowRouteErrorResponse } from "@/lib/xflow/route-error";
 import type { XflowAccount, XflowAddress, XflowPerson } from "@/types/xflow";
@@ -22,6 +22,11 @@ type XflowListResponse<T> = {
 type DesiredPersonPayload = ReturnType<typeof buildPersonPayload> & {
   roleLabel: string;
 };
+
+function canEditConnectedUserAccount(status?: string | null) {
+  const normalizedStatus = normalizeComparableValue(status);
+  return normalizedStatus === "" || normalizedStatus === "draft" || normalizedStatus === "input_required";
+}
 
 function buildPersonPayload(
   person: { fullName: string; pan: string },
@@ -142,28 +147,66 @@ export async function POST(request: NextRequest) {
     if (accountId) {
       currentAccount = await getXflowAccount(accountId);
     } else {
-      const createdAccount = await xflowRequest<XflowAccount>("accounts", {
-        method: "POST",
-        body: {
-          business_details: {
-            dba: input.basicInfo.dba,
-            email: input.basicInfo.email,
-            legal_name: input.basicInfo.legalName,
-            physical_address: {
-              country: input.aboutBusiness.registeredAddress.country,
-            },
-            type: xflowBusinessType,
-          },
-          nickname: buildConnectedUserNickname({
-            dba: input.basicInfo.dba,
-            legalName: input.basicInfo.legalName,
-          }),
-          type: "user",
-        },
-      });
+      const reusableAccount =
+        (await findReusableConnectedUserAccount({
+          businessType: xflowBusinessType,
+          dba: input.basicInfo.dba,
+          email: input.basicInfo.email,
+          legalName: input.basicInfo.legalName,
+        })) ?? null;
 
-      accountId = createdAccount.id;
-      currentAccount = createdAccount;
+      if (reusableAccount) {
+        accountId = reusableAccount.id;
+        currentAccount = reusableAccount;
+      } else {
+        const createdAccount = await xflowRequest<XflowAccount>("accounts", {
+          method: "POST",
+          body: {
+            business_details: {
+              dba: input.basicInfo.dba,
+              email: input.basicInfo.email,
+              legal_name: input.basicInfo.legalName,
+              physical_address: {
+                country: input.aboutBusiness.registeredAddress.country,
+              },
+              type: xflowBusinessType,
+            },
+            nickname: buildConnectedUserNickname({
+              dba: input.basicInfo.dba,
+              legalName: input.basicInfo.legalName,
+            }),
+            type: "user",
+          },
+        });
+
+        accountId = createdAccount.id;
+        currentAccount = createdAccount;
+      }
+    }
+
+    if (!canEditConnectedUserAccount(currentAccount.status)) {
+      const [account, payoutAddressesResponse, peopleResponse] = await Promise.all([
+        getXflowAccount(accountId),
+        xflowRequest<XflowListResponse<XflowAddress>>("addresses", {
+          headers: {
+            "Xflow-Account": accountId,
+          },
+          query: {
+            category: "user_payout",
+            linked_id: accountId,
+          },
+        }),
+        xflowRequest<XflowListResponse<XflowPerson>>("persons", {
+          headers: {
+            "Xflow-Account": accountId,
+          },
+        }),
+      ]);
+
+      return NextResponse.json({
+        ...buildConnectedUserSnapshot(account, payoutAddressesResponse.data, peopleResponse.data),
+        statusMessage: `Connected user is already ${formatConnectedUserStatus(account.status)}. Editing is locked for this Xflow account state.`,
+      });
     }
 
     const nickname = buildConnectedUserNickname({

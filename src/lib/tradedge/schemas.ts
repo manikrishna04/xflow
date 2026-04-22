@@ -43,7 +43,7 @@ export const onboardingAddressSchema = z.object({
 export const onboardingBusinessSchema = z.object({
   countryCode: countryCodeSchema,
   dateOfIncorporation: z.string().trim().min(1, "Enter the incorporation date."),
-  dba: z.string().trim().min(2, "Enter the display name."),
+  dba: z.string().trim().min(3, "Enter the display name (at least 3 characters)."),
   email: z.email("Enter a valid business email."),
   estimatedMonthlyVolume: z.string().trim().optional().or(z.literal("")),
   legalName: z.string().trim().min(2, "Enter the legal name."),
@@ -122,7 +122,7 @@ export const statusRequestSchema = z.object({
 export const onboardingBasicInfoSchema = z.object({
   email: z.email("Enter a valid business email."),
   legalName: z.string().trim().min(2, "Enter the legal name."),
-  dba: z.string().trim().min(2, "Enter the display name."),
+  dba: z.string().trim().min(3, "Enter the display name (at least 3 characters)."),
   businessType: connectedUserBusinessTypeSchema,
 });
 
