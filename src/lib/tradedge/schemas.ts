@@ -100,11 +100,17 @@ export const createPartnerSchema = z.object({
 
 export const createReceivableSchema = z.object({
   amountUsd: z.number().positive(),
-  buyerName: z.string().trim().min(2),
   exporterAccountId: z.string().trim().min(1),
   invoiceId: z.string().trim().min(1),
   partnerId: z.string().trim().min(1),
   referenceId: z.string().trim().min(1),
+  transactionType: z.enum(["goods", "services", "software"]),
+  purposeCode: z.string().trim().min(1),
+  invoiceNumber: z.string().trim().min(1),
+  description: z.string().trim().optional(),
+  invoiceDate: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Invoice date must use YYYY-MM-DD."),
+  dueDate: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Due date must use YYYY-MM-DD."),
+  metadata: z.record(z.string(), z.string().trim().max(500)).optional(),
 });
 
 export const simulatePaymentSchema = z.object({

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createReceivableSchema } from "@/lib/tradedge/schemas";
 import { xflowRequest } from "@/lib/xflow/client";
 import { xflowRouteErrorResponse } from "@/lib/xflow/route-error";
-import type { XflowReceivable } from "@/types/xflow";
+import type { XflowAccount, XflowReceivable } from "@/types/xflow";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,28 +24,26 @@ export async function POST(request: NextRequest) {
         "Xflow-Account": parsed.data.exporterAccountId,
       },
       body: {
-        account_id: parsed.data.exporterAccountId,
-        amount: amount,
+        account_id: parsed.data.partnerId,
         amount_maximum_reconcilable: amount,
         currency: "USD",
-        description: `TradEdge invoice ${parsed.data.referenceId} for ${parsed.data.buyerName}`,
+        description:
+          parsed.data.description?.trim() ||
+          `TradEdge invoice ${parsed.data.invoiceNumber}`,
         invoice: {
           amount,
-          creation_date: new Date().toISOString().slice(0, 10),
+          creation_date: parsed.data.invoiceDate,
           currency: "USD",
-          due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .slice(0, 10),
-          reference_number: parsed.data.referenceId,
+          due_date: parsed.data.dueDate,
+          reference_number: parsed.data.invoiceNumber,
         },
         metadata: {
           invoice_id: parsed.data.invoiceId,
           source: "tradedge_frontend",
+          ...(parsed.data.metadata ?? {}),
         },
-        partner_id: parsed.data.partnerId,
-        purpose_code: "S0803",
-        reference_id: parsed.data.referenceId,
-        transaction_type: "services",
+        purpose_code: parsed.data.purposeCode,
+        transaction_type: parsed.data.transactionType,
       },
     });
 
@@ -70,12 +68,49 @@ export async function POST(request: NextRequest) {
           },
         );
       } catch (error) {
+        console.error("Receivable confirmation failed:", error);
         confirmationWarning =
-          error instanceof Error ? error.message : "Could not auto-confirm receivable.";
+          error instanceof Error ? `Confirmation failed: ${error.message}` : "Could not auto-confirm receivable.";
+
+        // Check if receivable has system messages explaining why it can't be confirmed
+        if (receivable.system_message && receivable.system_message.length > 0) {
+          const systemMessages = receivable.system_message.map(msg => `${msg.code}: ${msg.message}`).join("; ");
+          confirmationWarning += ` System messages: ${systemMessages}`;
+        }
       }
     }
 
-    return NextResponse.json({ confirmationWarning, receivable });
+    const partner = await xflowRequest<XflowAccount>(`accounts/${parsed.data.partnerId}`, {
+      headers: {
+        "Xflow-Account": parsed.data.exporterAccountId,
+      },
+    });
+
+    // Check if partner account is active
+    if (partner.status && partner.status.toLowerCase() !== "active") {
+      confirmationWarning = confirmationWarning
+        ? `${confirmationWarning} Partner account status: ${partner.status}.`
+        : `Partner account status: ${partner.status}. Receivable may require active partner account.`;
+    }
+
+    // Also check exporter account status
+    try {
+      const exporter = await xflowRequest<XflowAccount>(`accounts/${parsed.data.exporterAccountId}`, {
+        headers: {
+          "Xflow-Account": parsed.data.exporterAccountId,
+        },
+      });
+
+      if (exporter.status && exporter.status.toLowerCase() !== "active") {
+        confirmationWarning = confirmationWarning
+          ? `${confirmationWarning} Exporter account status: ${exporter.status}.`
+          : `Exporter account status: ${exporter.status}. Receivable may require active exporter account.`;
+      }
+    } catch (exporterError) {
+      console.error("Could not check exporter account status:", exporterError);
+    }
+
+    return NextResponse.json({ confirmationWarning, receivable, partner });
   } catch (error) {
     return xflowRouteErrorResponse(error);
   }

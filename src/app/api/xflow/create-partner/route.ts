@@ -40,7 +40,56 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ partner });
+    let activationWarning: string | null = null;
+    let refreshedPartner = partner;
+
+    if (!partner.status || partner.status.toLowerCase() === "draft") {
+      try {
+        await xflowRequest(`accounts/${partner.id}/activate`, {
+          method: "POST",
+          headers: {
+            "Xflow-Account": parsed.data.exporterAccountId,
+          },
+        });
+
+        refreshedPartner = await xflowRequest<XflowAccount>(`accounts/${partner.id}`, {
+          headers: {
+            "Xflow-Account": parsed.data.exporterAccountId,
+          },
+        });
+
+        let attempts = 0;
+        while (
+          attempts < 3 &&
+          refreshedPartner.status?.toLowerCase() === "draft"
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          refreshedPartner = await xflowRequest<XflowAccount>(`accounts/${partner.id}`, {
+            headers: {
+              "Xflow-Account": parsed.data.exporterAccountId,
+            },
+          });
+          attempts += 1;
+        }
+      } catch (activationError) {
+        activationWarning =
+          activationError instanceof Error
+            ? `Partner activation failed: ${activationError.message}`
+            : "Partner activation failed.";
+
+        try {
+          refreshedPartner = await xflowRequest<XflowAccount>(`accounts/${partner.id}`, {
+            headers: {
+              "Xflow-Account": parsed.data.exporterAccountId,
+            },
+          });
+        } catch {
+          refreshedPartner = partner;
+        }
+      }
+    }
+
+    return NextResponse.json({ partner: refreshedPartner, activationWarning });
   } catch (error) {
     return xflowRouteErrorResponse(error);
   }
