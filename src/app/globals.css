@@ -1,26 +1,134 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 1rem;
+  --background: 42 100% 98%;
+  --foreground: 220 34% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 34% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 34% 14%;
+  --primary: 174 77% 27%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 36 86% 94%;
+  --secondary-foreground: 220 34% 14%;
+  --muted: 34 38% 92%;
+  --muted-foreground: 216 16% 38%;
+  --accent: 31 96% 55%;
+  --accent-foreground: 220 34% 14%;
+  --destructive: 0 79% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 26% 85%;
+  --input: 214 26% 85%;
+  --ring: 174 77% 27%;
+  --success: 148 57% 35%;
+  --warning: 36 90% 48%;
+  --danger: 0 72% 54%;
+  --ink-soft: rgba(19, 33, 68, 0.08);
+  --panel-border: rgba(19, 33, 68, 0.08);
+  --page-gradient:
+    radial-gradient(circle at top left, rgba(16, 150, 136, 0.18), transparent 30%),
+    radial-gradient(circle at top right, rgba(255, 167, 38, 0.2), transparent 28%),
+    linear-gradient(180deg, #fffdf7 0%, #f7f3e9 46%, #f0f4f8 100%);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans:
+    "Aptos", "Segoe UI Variable", "Segoe UI", "Trebuchet MS", ui-sans-serif,
+    system-ui, sans-serif;
+  --font-display:
+    "Bahnschrift", "Aptos Display", "Aptos", "Segoe UI Variable", sans-serif;
+  --font-mono:
+    "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    background: var(--page-gradient);
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+  }
+
+  ::selection {
+    background: rgba(16, 150, 136, 0.18);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.panel-surface {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--panel-border);
+  box-shadow:
+    0 24px 60px rgba(19, 33, 68, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(18px);
+}
+
+.pill-surface {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(19, 33, 68, 0.08);
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(19, 33, 68, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 33, 68, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.hero-glow {
+  position: relative;
+}
+
+.hero-glow::before {
+  content: "";
+  position: absolute;
+  inset: -16% auto auto -12%;
+  width: 18rem;
+  height: 18rem;
+  background: radial-gradient(circle, rgba(16, 150, 136, 0.24), transparent 70%);
+  pointer-events: none;
+}
+
+.data-kicker {
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(19, 33, 68, 0.62);
 }
