@@ -6,6 +6,27 @@ export function formatCurrency(amount: number, currency: string) {
   }).format(amount);
 }
 
+export function parseCurrencyAmount(value?: string | number | null) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function formatCurrencyAmount(value?: string | number | null, currency?: string | null) {
+  if (!currency) {
+    return String(value ?? "0.00");
+  }
+
+  return formatCurrency(parseCurrencyAmount(value), currency);
+}
+
 export function formatDateTime(value?: string | number | null) {
   if (!value) {
     return "Not synced yet";

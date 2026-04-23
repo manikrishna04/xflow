@@ -117,9 +117,12 @@ export function ReceivableCreateScreen() {
   const directory = buildPartnerDirectory(partners, invoices);
   const selectedPartner =
     directory.find((entry) => entry.id === form.partnerId) ?? null;
+  const recommendedPurposeCodes: readonly string[] = [
+    ...COMMON_PURPOSE_CODES_BY_PRODUCT_CATEGORY[form.transactionType],
+  ];
   const categoryPurposeCodes =
     purposeCodesQuery.data?.filter((option) =>
-      (COMMON_PURPOSE_CODES_BY_PRODUCT_CATEGORY[form.transactionType] || []).includes(option.code),
+      recommendedPurposeCodes.includes(option.code),
     ) ?? [];
   const accountStatus = connectedUserQuery.data?.account.status ?? exporter.status;
   const transactionsEnabled = isConnectedUserActive(accountStatus);

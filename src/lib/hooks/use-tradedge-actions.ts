@@ -18,7 +18,13 @@ import type {
   PartnerRecord,
   RemoteStatusSnapshot,
 } from "@/types/tradedge";
-import type { XflowAccount, XflowPayout, XflowReceivable } from "@/types/xflow";
+import type {
+  XflowAccount,
+  XflowBalance,
+  XflowPayout,
+  XflowReceivable,
+  XflowTransfer,
+} from "@/types/xflow";
 
 type CreateAccountResponse = {
   account: XflowAccount;
@@ -63,6 +69,14 @@ type PartnerCreationInput = {
   metadata?: Record<string, string>;
   nickname: string;
   partnerType: "company" | "individual";
+};
+
+type ConnectedUserTopupResponse = {
+  balance: XflowBalance | null;
+  recentTopups: XflowTransfer[];
+  topUpSourceAccountId: string | null;
+  transfer: XflowTransfer;
+  treasuryWarning?: string | null;
 };
 
 function buildPartnerRecord(
@@ -308,6 +322,32 @@ export function useActivateConnectedUserMutation(accountId?: string | null) {
       return apiPost<ConnectedUserSnapshot, Record<string, never>>(
         `/api/xflow/account/${accountId}/activate`,
         {},
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["connected-user", accountId],
+      });
+    },
+  });
+}
+
+export function useTopUpConnectedUserBalanceMutation(accountId?: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      amount: string;
+      currency: string;
+      description?: string;
+    }) => {
+      if (!accountId) {
+        throw new Error("Connected-user account id is missing.");
+      }
+
+      return apiPost<ConnectedUserTopupResponse, typeof input>(
+        `/api/xflow/account/${accountId}/topup`,
+        input,
       );
     },
     onSuccess: () => {

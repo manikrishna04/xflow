@@ -11,6 +11,11 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use the YYYY-MM-DD date format.");
 
 const metadataString = z.string().trim().max(500);
+const isoCurrencyCode = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{3}$/, "Use a valid ISO 4217 currency code.");
 
 export const receivableInputSchema = z.object({
   accountId: z.string().trim().optional(),
@@ -69,5 +74,11 @@ export const createPartnerAccountSchema = z.object({
   }),
   nickname: z.string().trim().min(1),
   type: z.literal("partner"),
+});
+
+export const connectedUserTopupSchema = z.object({
+  amount: decimalAmount.refine((value) => Number(value) > 0, "Enter an amount greater than zero."),
+  currency: isoCurrencyCode.default("USD"),
+  description: z.string().trim().max(255).optional(),
   metadata: z.record(z.string(), metadataString).optional(),
 });
