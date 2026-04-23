@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 const navigationItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/onboarding", icon: ShieldEllipsis, label: "Onboarding" },
-  { href: "/invoices", icon: FileText, label: "Invoices" },
+  { href: "/receivables", icon: FileText, label: "Receivables" },
   { href: "/partners", icon: Users, label: "Partners" },
 ];
 
@@ -36,9 +36,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const pageTitle = useMemo(() => {
     if (pathname.startsWith("/onboarding")) return "Connected-user onboarding";
-    if (pathname.startsWith("/invoices/new")) return "Issue a USD receivable";
-    if (pathname.startsWith("/invoices/")) return "Invoice control room";
-    if (pathname.startsWith("/invoices")) return "Receivables ledger";
+    if (pathname.startsWith("/receivables/new")) return "Create receivable";
+    if (pathname.startsWith("/receivables/")) return "Receivable control room";
+    if (pathname.startsWith("/receivables")) return "Receivables ledger";
+    if (pathname.startsWith("/partners/new")) return "Add partner";
     if (pathname.startsWith("/partners")) return "Partners";
 
     return "Connected exporter workspace";
@@ -86,10 +87,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <Link href="/invoices/new" className="mt-8">
+        <Link href="/receivables/new" className="mt-8">
           <Button className="w-full justify-center">
             <PlusCircle className="h-4 w-4" />
-            New Invoice
+            Create Receivable
           </Button>
         </Link>
 
@@ -123,10 +124,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="pill-surface rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-foreground/60">
                 Secret Key Lives Server-Side
               </div>
-              <Link href="/invoices/new" className="lg:hidden">
+              <Link href="/receivables/new" className="lg:hidden">
                 <Button size="sm">
                   <PlusCircle className="h-4 w-4" />
-                  New Invoice
+                  Create Receivable
                 </Button>
               </Link>
             </div>

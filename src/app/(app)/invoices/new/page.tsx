@@ -1,5 +1,5 @@
-import { InvoiceCreateScreen } from "@/components/screens/invoice-create-screen";
+import { redirect } from "next/navigation";
 
 export default function NewInvoicePage() {
-  return <InvoiceCreateScreen />;
+  redirect("/receivables/new");
 }

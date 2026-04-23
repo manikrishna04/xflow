@@ -150,6 +150,7 @@ export type XflowReceivable = {
   amount?: string | null;
   amount_locked?: string | null;
   amount_maximum_reconcilable?: string | null;
+  amount_reconcilable?: string | null;
   amount_reconciled?: string | null;
   amount_reconciled_not_settled?: string | null;
   amount_settled_payouts?: string | null;
@@ -161,6 +162,7 @@ export type XflowReceivable = {
     amount?: string | null;
     creation_date?: string | null;
     currency?: string | null;
+    document?: string | null;
     due_date?: string | null;
     reference_number?: string | null;
   } | null;
@@ -197,3 +199,39 @@ export type XflowPayout = {
   tracking_info?: string | null;
   unique_transaction_reference?: string | null;
 };
+
+export type XflowFile = {
+  created?: number | null;
+  id: string;
+  livemode?: boolean | null;
+  object?: string | null;
+  purpose?: string | null;
+  size?: number | null;
+  type?: string | null;
+} & Record<string, unknown>;
+
+export type XflowReceivableReconciliationPreview = {
+  amount?: string | null;
+  currency?: string | null;
+  estimated_settlement_date?: number | null;
+  expected_settlement_date?: number | null;
+  live_fx?: string | null;
+  object?: string | null;
+  reconciliation_time?: number | null;
+  settlement_date?: number | null;
+  timeline?: Array<Record<string, unknown>> | null;
+} & Record<string, unknown>;
+
+export type XflowReceivableReconciliation = {
+  amount?: string | null;
+  created?: number | null;
+  currency?: string | null;
+  id?: string | null;
+  live_fx?: string | null;
+  object?: string | null;
+  quote_lock_id?: string | null;
+  status?: string | null;
+  to?: {
+    address_id?: string | null;
+  } | null;
+} & Record<string, unknown>;

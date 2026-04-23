@@ -23,6 +23,22 @@ export function formatDateTime(value?: string | number | null) {
   }).format(date);
 }
 
+export function formatDate(value?: string | number | null) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const date = typeof value === "number" ? new Date(value * 1000) : new Date(value);
+
+  if (Number.isNaN(date.valueOf())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
 export function formatStatusLabel(status?: string | null) {
   if (!status) {
     return "Not started";

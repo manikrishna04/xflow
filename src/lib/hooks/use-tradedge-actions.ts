@@ -15,6 +15,7 @@ import type {
   ConnectedUserSnapshot,
   ExporterProfile,
   InvoiceRecord,
+  PartnerRecord,
   RemoteStatusSnapshot,
 } from "@/types/tradedge";
 import type { XflowAccount, XflowPayout, XflowReceivable } from "@/types/xflow";
@@ -24,10 +25,12 @@ type CreateAccountResponse = {
 };
 
 type CreatePartnerResponse = {
+  activationWarning?: string | null;
   partner: XflowAccount;
 };
 
 type CreateReceivableResponse = {
+  confirmationWarning?: string | null;
   receivable: XflowReceivable;
   partner: XflowAccount;
 };
@@ -44,6 +47,40 @@ type CreatePayoutResponse = {
 type PurposeCodesResponse = {
   purposeCodes: PurposeCodeOption[];
 };
+
+type PartnerCreationInput = {
+  address: {
+    city: string;
+    country: string;
+    line1: string;
+    line2?: string;
+    postalCode: string;
+    state: string;
+  };
+  country: string;
+  email: string;
+  legalName: string;
+  metadata?: Record<string, string>;
+  nickname: string;
+  partnerType: "company" | "individual";
+};
+
+function buildPartnerRecord(
+  partner: XflowAccount,
+  activationWarning?: string | null,
+): PartnerRecord {
+  const timestamp = partner.created
+    ? new Date(partner.created * 1000).toISOString()
+    : new Date().toISOString();
+
+  return {
+    activationWarning: activationWarning ?? null,
+    createdAt: timestamp,
+    id: partner.id,
+    snapshot: partner,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 function buildExporterFromSnapshot(
   snapshot: ConnectedUserSnapshot,
@@ -380,23 +417,23 @@ export function useCompleteConnectedUserOnboardingMutation(accountId?: string | 
 export function useCreateInvoiceMutation() {
   const exporter = useTradEdgeStore((state) => state.exporter);
   const upsertInvoice = useTradEdgeStore((state) => state.upsertInvoice);
+  const upsertPartner = useTradEdgeStore((state) => state.upsertPartner);
 
   return useMutation({
     mutationFn: async (input: {
       amountUsd: number;
-      partnerId?: string;
-      buyerCountry: string;
-      buyerName: string;
-      transactionType: "goods" | "services" | "software";
-      purposeCode: string;
-      invoiceNumber: string;
       description?: string;
-      invoiceDate: string;
       dueDate: string;
+      invoiceDate: string;
+      invoiceDocumentId?: string;
+      invoiceNumber: string;
       metadata?: Record<string, string>;
+      partnerDetails: PartnerCreationInput;
+      purposeCode: string;
+      transactionType: "goods" | "services" | "software";
     }) => {
       if (!exporter) {
-        throw new Error("Complete connected-user onboarding before issuing invoices.");
+        throw new Error("Complete connected-user onboarding before creating receivables.");
       }
 
       if (!isConnectedUserActive(exporter.status)) {
@@ -412,67 +449,54 @@ export function useCreateInvoiceMutation() {
       const invoiceId = crypto.randomUUID();
       const referenceId = buildReferenceId();
 
-      const partner: XflowAccount = input.partnerId
-        ? {
-            id: input.partnerId,
-            nickname: input.buyerName,
-            business_details: {
-              legal_name: input.buyerName,
-              physical_address: {
-                country: input.buyerCountry,
-              },
-            },
-          }
-        : await apiPost<
-            CreatePartnerResponse,
-            {
-              buyerCountry: string;
-              buyerName: string;
-              exporterAccountId: string;
-              referenceId: string;
-            }
-          >("/api/xflow/create-partner", {
-            buyerCountry: input.buyerCountry,
-            buyerName: input.buyerName,
-            exporterAccountId: exporter.accountId,
-            referenceId,
-          }).then((response) => response.partner);
+      const partnerResponse = await apiPost<
+        CreatePartnerResponse,
+        PartnerCreationInput & { exporterAccountId: string }
+      >("/api/xflow/create-partner-account", {
+        ...input.partnerDetails,
+        exporterAccountId: exporter.accountId,
+      });
 
-      const { receivable, partner: returnedPartner } = await apiPost<
+      const partner = partnerResponse.partner;
+
+      const { confirmationWarning, receivable, partner: returnedPartner } = await apiPost<
         CreateReceivableResponse,
         {
           amountUsd: number;
+          description?: string;
+          dueDate: string;
           exporterAccountId: string;
+          invoiceDate: string;
+          invoiceDocumentId?: string;
           invoiceId: string;
+          invoiceNumber: string;
+          metadata?: Record<string, string>;
           partnerId: string;
+          purposeCode: string;
           referenceId: string;
           transactionType: "goods" | "services" | "software";
-          purposeCode: string;
-          invoiceNumber: string;
-          description?: string;
-          invoiceDate: string;
-          dueDate: string;
-          metadata?: Record<string, string>;
         }
       >("/api/xflow/create-receivable", {
         amountUsd: input.amountUsd,
-        exporterAccountId: exporter.accountId,
-        invoiceId,
-        partnerId: partner.id,
-        referenceId,
-        transactionType: input.transactionType,
-        purposeCode: input.purposeCode,
-        invoiceNumber: input.invoiceNumber,
         description: input.description,
+        exporterAccountId: exporter.accountId,
         invoiceDate: input.invoiceDate,
+        invoiceDocumentId: input.invoiceDocumentId,
+        invoiceId,
+        invoiceNumber: input.invoiceNumber,
         dueDate: input.dueDate,
         metadata: input.metadata,
+        partnerId: partner.id,
+        purposeCode: input.purposeCode,
+        referenceId,
+        transactionType: input.transactionType,
       });
 
       return buildInvoiceRecord({
         amountUsd: input.amountUsd,
-        buyerCountry: input.buyerCountry,
-        buyerName: input.buyerName,
+        buyerCountry: input.partnerDetails.country,
+        buyerName: input.partnerDetails.legalName,
+        creationWarning: confirmationWarning,
         exporterAccountId: exporter.accountId,
         exporterLegalName: exporter.legalName,
         id: invoiceId,
@@ -482,6 +506,104 @@ export function useCreateInvoiceMutation() {
       });
     },
     onSuccess: (invoice) => {
+      if (invoice.partnerSnapshot) {
+        upsertPartner(buildPartnerRecord(invoice.partnerSnapshot));
+      }
+      upsertInvoice(invoice);
+    },
+  });
+}
+
+export function useCreateReceivableMutation() {
+  const exporter = useTradEdgeStore((state) => state.exporter);
+  const upsertInvoice = useTradEdgeStore((state) => state.upsertInvoice);
+  const upsertPartner = useTradEdgeStore((state) => state.upsertPartner);
+
+  return useMutation({
+    mutationFn: async (input: {
+      amountUsd: number;
+      description?: string;
+      dueDate?: string;
+      invoiceDate: string;
+      invoiceDocumentId?: string;
+      invoiceNumber: string;
+      metadata?: Record<string, string>;
+      partnerId: string;
+      purposeCode: string;
+      transactionType: "goods" | "services" | "software";
+    }) => {
+      if (!exporter) {
+        throw new Error("Complete connected-user onboarding before creating receivables.");
+      }
+
+      if (!isConnectedUserActive(exporter.status)) {
+        if (canResumeActivation(exporter.status)) {
+          throw new Error(
+            "Finish connected-user onboarding before creating receivables.",
+          );
+        }
+
+        throw new Error("Receivables are blocked until the connected user is active.");
+      }
+
+      const invoiceId = crypto.randomUUID();
+      const referenceId = buildReferenceId();
+
+      const { confirmationWarning, partner, receivable } = await apiPost<
+        CreateReceivableResponse,
+        {
+          amountUsd: number;
+          description?: string;
+          dueDate?: string;
+          exporterAccountId: string;
+          invoiceDate: string;
+          invoiceDocumentId?: string;
+          invoiceId: string;
+          invoiceNumber: string;
+          metadata?: Record<string, string>;
+          partnerId: string;
+          purposeCode: string;
+          referenceId: string;
+          transactionType: "goods" | "services" | "software";
+        }
+      >("/api/xflow/create-receivable", {
+        amountUsd: input.amountUsd,
+        description: input.description,
+        dueDate: input.dueDate,
+        exporterAccountId: exporter.accountId,
+        invoiceDate: input.invoiceDate,
+        invoiceDocumentId: input.invoiceDocumentId,
+        invoiceId,
+        invoiceNumber: input.invoiceNumber,
+        metadata: input.metadata,
+        partnerId: input.partnerId,
+        purposeCode: input.purposeCode,
+        referenceId,
+        transactionType: input.transactionType,
+      });
+
+      const buyerCountry = partner.business_details?.physical_address?.country || "US";
+      const buyerName =
+        partner.business_details?.legal_name || partner.nickname || input.partnerId;
+
+      return {
+        invoice: buildInvoiceRecord({
+          amountUsd: input.amountUsd,
+          buyerCountry,
+          buyerName,
+          creationWarning: confirmationWarning,
+          exporterAccountId: exporter.accountId,
+          exporterLegalName: exporter.legalName,
+          id: invoiceId,
+          partner,
+          receivable,
+          referenceId,
+        }),
+        partner: buildPartnerRecord(partner),
+      };
+    },
+    onSuccess: ({ invoice, partner }) => {
+      upsertPartner(partner);
       upsertInvoice(invoice);
     },
   });
@@ -489,24 +611,24 @@ export function useCreateInvoiceMutation() {
 
 export function useCreatePartnerAccountMutation() {
   const exporter = useTradEdgeStore((state) => state.exporter);
+  const upsertPartner = useTradEdgeStore((state) => state.upsertPartner);
 
   return useMutation({
     mutationFn: async (input: {
-      business_details: {
-        email: string;
-        legal_name: string;
-        physical_address: {
-          city: string;
-          country: string;
-          line1: string;
-          postal_code: string;
-          state: string;
-        };
-        type: "company" | "individual";
+      address: {
+        city: string;
+        country: string;
+        line1: string;
+        line2?: string;
+        postalCode: string;
+        state: string;
       };
-      nickname: string;
-      type: "partner";
+      country: string;
+      email: string;
+      legalName: string;
       metadata?: Record<string, string>;
+      nickname: string;
+      partnerType: "company" | "individual";
     }) => {
       if (!exporter) {
         throw new Error("Exporter not found. Complete onboarding first.");
@@ -519,6 +641,9 @@ export function useCreatePartnerAccountMutation() {
           exporterAccountId: exporter.accountId,
         },
       );
+    },
+    onSuccess: ({ activationWarning, partner }) => {
+      upsertPartner(buildPartnerRecord(partner, activationWarning));
     },
   });
 }
@@ -724,15 +849,14 @@ export function useInvoiceStatusQuery(invoice?: InvoiceRecord | null) {
     }
 
     const newStatus = applyRemoteStatus(invoice, query.data);
-    
-    // Only update if actual statuses changed, not just timestamps
+
     if (
       newStatus.receivableStatus !== invoice.receivableStatus ||
       newStatus.payoutStatus !== invoice.payoutStatus
     ) {
       updateInvoice(invoice.id, newStatus);
     }
-  }, [invoice?.id, invoice?.receivableStatus, invoice?.payoutStatus, query.data, updateInvoice]);
+  }, [invoice, query.data, updateInvoice]);
 
   return query;
 }

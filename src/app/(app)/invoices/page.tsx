@@ -1,5 +1,5 @@
-import { InvoiceListScreen } from "@/components/screens/invoice-list-screen";
+import { redirect } from "next/navigation";
 
 export default function InvoicesPage() {
-  return <InvoiceListScreen />;
+  redirect("/receivables");
 }

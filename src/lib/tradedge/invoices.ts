@@ -121,6 +121,7 @@ export function buildInvoiceRecord(input: {
   amountUsd: number;
   buyerCountry: string;
   buyerName: string;
+  creationWarning?: string | null;
   exporterAccountId: string;
   exporterLegalName?: string;
   id: string;
@@ -133,6 +134,7 @@ export function buildInvoiceRecord(input: {
     buyerCountry: input.buyerCountry,
     buyerEmail: deriveBuyerEmail(input.buyerName, input.referenceId),
     buyerName: input.buyerName,
+    creationWarning: input.creationWarning ?? null,
     createdAt: new Date().toISOString(),
     exporterAccountId: input.exporterAccountId,
     exporterLegalName: input.exporterLegalName,

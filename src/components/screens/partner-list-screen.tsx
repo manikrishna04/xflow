@@ -1,81 +1,153 @@
 "use client";
 
-import { Users } from "lucide-react";
-import { useMemo } from "react";
+import Link from "next/link";
+import { ArrowUpRight, Plus, Search, Users } from "lucide-react";
+import { useDeferredValue, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { formatCurrency } from "@/lib/tradedge/format";
+import {
+  buildPartnerDirectory,
+  getPartnerCountry,
+  getPartnerEmail,
+  getPartnerLegalName,
+} from "@/lib/tradedge/partners";
 import { useTradEdgeStore } from "@/lib/store/tradedge-store";
 
 export function PartnerListScreen() {
   const invoices = useTradEdgeStore((state) => state.invoices);
+  const partners = useTradEdgeStore((state) => state.partners);
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const directory = buildPartnerDirectory(partners, invoices);
 
-  const partners = useMemo(() => {
-    const partnerMap = new Map();
-    invoices.forEach((invoice) => {
-      if (invoice.partnerSnapshot && !partnerMap.has(invoice.partnerSnapshot.id)) {
-        partnerMap.set(invoice.partnerSnapshot.id, invoice.partnerSnapshot);
-      }
-    });
-    return Array.from(partnerMap.values());
-  }, [invoices]);
+  const filteredPartners = directory.filter((entry) => {
+    const query = deferredSearch.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    return [
+      getPartnerLegalName(entry.partner),
+      entry.partner.nickname || "",
+      getPartnerEmail(entry.partner),
+      getPartnerCountry(entry.partner),
+      entry.partner.status || "",
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Partner Network"
-        title="Partners"
-        description="View partners that have been created through your invoice transactions. Manual partner creation is not currently available in this Xflow environment."
+        eyebrow="Partners"
+        title="Partner directory"
+        description="Manage partner records separately, then reuse them while creating new receivables."
+        actions={
+          <Link href="/partners/new">
+            <Button>
+              <Plus className="h-4 w-4" />
+              Add Partner
+            </Button>
+          </Link>
+        }
       />
 
-      {partners.length === 0 ? (
+      {directory.length === 0 ? (
         <EmptyState
           title="No partners yet"
-          description="Partners are created automatically when you issue invoices. Create your first invoice to see partners appear here."
-          actionHref="/invoices/new"
-          actionLabel="Create Invoice"
+          description="Create your first partner to start issuing receivables from a separate partner module."
+          actionHref="/partners/new"
+          actionLabel="Add Partner"
         />
       ) : (
         <SectionCard>
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Your Partner Network ({partners.length})
-            </h3>
-            <div className="grid gap-4">
-              {partners.map((partner) => (
-                <div key={partner.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <h4 className="font-medium">{partner.nickname}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {partner.business_details?.legal_name || "No legal name"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {partner.business_details?.email || "No email"}
-                    </p>
-                  </div>
-                  <StatusBadge status={partner.status || "unknown"} />
-                </div>
-              ))}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold">Existing partners</h2>
+                <p className="mt-1 text-sm text-foreground/65">
+                  {directory.length} partner records available for receivable creation.
+                </p>
+              </div>
             </div>
+
+            <div className="relative w-full lg:w-80">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/35" />
+              <Input
+                className="pl-11"
+                placeholder="Search partner, email, country, or status"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-hidden rounded-[28px] border border-black/8 bg-white/74">
+            <div className="hidden grid-cols-[1.35fr_0.7fr_0.8fr_0.8fr_0.7fr_0.45fr] gap-4 border-b border-black/8 px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45 md:grid">
+              <span>Partner Information</span>
+              <span>Receivables</span>
+              <span>Amount Pending</span>
+              <span>Partner Balance</span>
+              <span>Status</span>
+              <span />
+            </div>
+
+            {filteredPartners.map((entry) => (
+              <div
+                key={entry.id}
+                className="grid gap-4 border-t border-black/6 px-6 py-5 first:border-t-0 md:grid-cols-[1.35fr_0.7fr_0.8fr_0.8fr_0.7fr_0.45fr]"
+              >
+                <div>
+                  <p className="text-base font-semibold text-foreground">
+                    {getPartnerLegalName(entry.partner)}
+                  </p>
+                  <p className="mt-1 text-sm text-foreground/64">{getPartnerCountry(entry.partner)}</p>
+                  <p className="mt-1 text-sm text-foreground/58">{getPartnerEmail(entry.partner)}</p>
+                  {entry.activationWarning ? (
+                    <p className="mt-2 text-xs text-[rgb(170,97,23)]">{entry.activationWarning}</p>
+                  ) : null}
+                </div>
+                <div className="text-sm font-semibold text-foreground/74">
+                  {entry.receivableCount > 0 ? `Total ${entry.receivableCount}` : "Nil"}
+                </div>
+                <div className="text-sm text-foreground/68">
+                  {entry.pendingAmountUsd > 0
+                    ? formatCurrency(entry.pendingAmountUsd, "USD")
+                    : "Nil"}
+                </div>
+                <div className="text-sm text-foreground/68">
+                  {entry.partnerBalanceUsd > 0
+                    ? formatCurrency(entry.partnerBalanceUsd, "USD")
+                    : "Nil"}
+                </div>
+                <div>
+                  <StatusBadge status={entry.partner.status} />
+                </div>
+                <div className="flex items-start justify-end">
+                  <Link href="/receivables/new" className="inline-flex">
+                    <Button variant="ghost" size="sm">
+                      Use
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </SectionCard>
       )}
-
-      <SectionCard>
-        <div className="text-center py-8">
-          <h3 className="text-lg font-semibold mb-2">Manual Partner Creation</h3>
-          <p className="text-muted-foreground mb-4">
-            The ability to manually create partner accounts is not currently enabled in your Xflow environment.
-            Partners are automatically created when issuing invoices to new buyers.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            If you need to create partners manually, please contact Xflow support to enable this feature.
-          </p>
-        </div>
-      </SectionCard>
     </div>
   );
 }

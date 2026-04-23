@@ -27,11 +27,31 @@ export type PurposeCodeOption = {
   description: string;
 };
 
+export type PartnerRecord = {
+  activationWarning?: string | null;
+  createdAt: string;
+  id: string;
+  snapshot: XflowAccount;
+  updatedAt: string;
+};
+
+export type ReceivableListItem = {
+  partner: XflowAccount | null;
+  receivable: XflowReceivable;
+};
+
+export type PartnerDirectoryItem = {
+  partner: XflowAccount;
+  pendingAmount: number;
+  receivableCount: number;
+};
+
 export type InvoiceRecord = {
   amountUsd: number;
   buyerCountry: string;
   buyerEmail: string;
   buyerName: string;
+  creationWarning?: string | null;
   createdAt: string;
   exporterAccountId: string;
   exporterLegalName?: string;

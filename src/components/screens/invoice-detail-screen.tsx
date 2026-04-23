@@ -39,7 +39,15 @@ function canTriggerPayout(status?: string | null) {
   return ["completed", "paid", "reconciled", "activated"].includes(normalized);
 }
 
-export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
+export function InvoiceDetailScreen({
+  basePath = "/invoices",
+  invoiceId,
+  variant = "invoice",
+}: {
+  basePath?: string;
+  invoiceId: string;
+  variant?: "invoice" | "receivable";
+}) {
   const hydrated = useHydrated();
   const exporter = useTradEdgeStore((state) => state.exporter);
   const invoice = useTradEdgeStore(
@@ -55,10 +63,10 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
   if (hydrated && !invoice) {
     return (
       <EmptyState
-        title="Invoice not found in local storage"
+        title={`${variant === "receivable" ? "Receivable" : "Invoice"} not found in local storage`}
         description="This build is frontend-only, so invoice records live in the browser. Re-open the flow from the same browser session or create the invoice again."
-        actionHref="/invoices"
-        actionLabel="Back to invoices"
+        actionHref={basePath}
+        actionLabel={`Back to ${variant === "receivable" ? "receivables" : "invoices"}`}
       />
     );
   }
@@ -72,13 +80,14 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
   const instructionItems = extractInstructionItems(invoice.receivableSnapshot);
   const accountStatus = connectedUserQuery.data?.account.status ?? exporter?.status;
   const transactionsEnabled = isConnectedUserActive(accountStatus);
+  const recordLabel = variant === "receivable" ? "receivable" : "invoice";
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Invoice Detail"
+        eyebrow={variant === "receivable" ? "Receivable Detail" : "Invoice Detail"}
         title={invoice.referenceId}
-        description={`Buyer ${invoice.buyerName} in ${invoice.buyerCountry}. Use this page to check payment instructions, simulate settlement in sandbox, and trigger the connected exporter's payout.`}
+        description={`Buyer ${invoice.buyerName} in ${invoice.buyerCountry}. Use this page to check payment instructions, simulate settlement in sandbox, and trigger the connected exporter's payout for this ${recordLabel}.`}
         actions={
           <>
             <Button
@@ -86,10 +95,10 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
               onClick={async () => {
                 try {
                   await syncStatus.mutateAsync(invoice);
-                  toast.success("Live status synced from Xflow.");
+                  toast.success(`Live ${recordLabel} status synced from Xflow.`);
                 } catch (error) {
                   toast.error(
-                    error instanceof Error ? error.message : "Could not sync invoice status.",
+                    error instanceof Error ? error.message : `Could not sync ${recordLabel} status.`,
                   );
                 }
               }}
@@ -100,13 +109,23 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
             </Button>
             <Link href={`/pay/${invoice.id}`}>
               <Button variant="secondary">
-                Buyer page
+                Payment page
                 <ArrowUpRight className="h-4 w-4" />
               </Button>
             </Link>
           </>
         }
       />
+
+      {invoice.creationWarning ? (
+        <SectionCard>
+          <p className="data-kicker">Creation Warning</p>
+          <h2 className="mt-3 text-2xl font-semibold">Receivable needs attention</h2>
+          <p className="mt-3 text-sm leading-7 text-[rgb(170,97,23)]">
+            {invoice.creationWarning}
+          </p>
+        </SectionCard>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <SectionCard className="p-5">
@@ -313,7 +332,7 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
 
           <SectionCard>
             <p className="data-kicker">Buyer Link</p>
-            <h2 className="mt-3 text-2xl font-semibold">Public invoice page</h2>
+            <h2 className="mt-3 text-2xl font-semibold">Public payment page</h2>
             <p className="mt-3 text-sm leading-7 text-foreground/65">
               {hydrated && typeof window !== "undefined"
                 ? `${window.location.origin}/pay/${invoice.id}`

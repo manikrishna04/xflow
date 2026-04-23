@@ -47,7 +47,13 @@ function matchesFilter(
   return true;
 }
 
-export function InvoiceListScreen() {
+export function InvoiceListScreen({
+  basePath = "/invoices",
+  variant = "invoice",
+}: {
+  basePath?: string;
+  variant?: "invoice" | "receivable";
+}) {
   const exporter = useTradEdgeStore((state) => state.exporter);
   const connectedUserQuery = useConnectedUserQuery(exporter?.accountId);
   const invoices = useTradEdgeStore((state) => state.invoices);
@@ -55,6 +61,7 @@ export function InvoiceListScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const deferredSearch = useDeferredValue(search);
+  const isReceivableMode = variant === "receivable";
 
   if (!exporter) {
     return (
@@ -85,8 +92,8 @@ export function InvoiceListScreen() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Invoices"
-        title="Receivable ledger"
+        eyebrow={isReceivableMode ? "Receivables" : "Invoices"}
+        title={isReceivableMode ? "Receivables ledger" : "Receivable ledger"}
         description="Every invoice row is stored locally and linked to Xflow object ids for the connected exporter. Use the detail page for buyer instructions, simulation, and payout actions."
         actions={
           <>
@@ -107,8 +114,8 @@ export function InvoiceListScreen() {
               <RefreshCcw className="h-4 w-4" />
               Refresh
             </Button>
-            <Link href="/invoices/new">
-              <Button>New invoice</Button>
+            <Link href={`${basePath}/new`}>
+              <Button>{isReceivableMode ? "New receivable" : "New receivable"}</Button>
             </Link>
           </>
         }
@@ -157,7 +164,7 @@ export function InvoiceListScreen() {
             {filteredInvoices.map((invoice) => (
               <Link
                 key={invoice.id}
-                href={`/invoices/${invoice.id}`}
+                href={`${basePath}/${invoice.id}`}
                 className="grid gap-4 border-t border-black/6 px-6 py-5 transition first:border-t-0 hover:bg-black/[0.02] md:grid-cols-[1.3fr_0.9fr_0.8fr_0.9fr_0.9fr]"
               >
                 <div>

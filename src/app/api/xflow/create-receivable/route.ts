@@ -5,6 +5,35 @@ import { xflowRequest } from "@/lib/xflow/client";
 import { xflowRouteErrorResponse } from "@/lib/xflow/route-error";
 import type { XflowAccount, XflowReceivable } from "@/types/xflow";
 
+async function refetchReceivable(
+  exporterAccountId: string,
+  receivableId: string,
+  attempts = 4,
+) {
+  let receivable = await xflowRequest<XflowReceivable>(`receivables/${receivableId}`, {
+    headers: {
+      "Xflow-Account": exporterAccountId,
+    },
+  });
+
+  let remainingAttempts = attempts;
+
+  while (
+    remainingAttempts > 0 &&
+    (!receivable.status || receivable.status.toLowerCase() === "draft")
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    receivable = await xflowRequest<XflowReceivable>(`receivables/${receivableId}`, {
+      headers: {
+        "Xflow-Account": exporterAccountId,
+      },
+    });
+    remainingAttempts -= 1;
+  }
+
+  return receivable;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const parsed = createReceivableSchema.safeParse(await request.json());
@@ -29,12 +58,13 @@ export async function POST(request: NextRequest) {
         currency: "USD",
         description:
           parsed.data.description?.trim() ||
-          `TradEdge invoice ${parsed.data.invoiceNumber}`,
+          `TradEdge receivable ${parsed.data.invoiceNumber}`,
         invoice: {
           amount,
           creation_date: parsed.data.invoiceDate,
           currency: "USD",
-          due_date: parsed.data.dueDate,
+          ...(parsed.data.invoiceDocumentId ? { document: parsed.data.invoiceDocumentId } : {}),
+          ...(parsed.data.dueDate ? { due_date: parsed.data.dueDate } : {}),
           reference_number: parsed.data.invoiceNumber,
         },
         metadata: {
@@ -59,22 +89,35 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        receivable = await xflowRequest<XflowReceivable>(
-          `receivables/${createdReceivable.id}`,
-          {
-            headers: {
-              "Xflow-Account": parsed.data.exporterAccountId,
-            },
-          },
+        receivable = await refetchReceivable(
+          parsed.data.exporterAccountId,
+          createdReceivable.id,
         );
+
+        if (!receivable.status || receivable.status.toLowerCase() === "draft") {
+          confirmationWarning =
+            "Receivable confirmation was requested, but the latest status is still Draft.";
+        }
       } catch (error) {
         console.error("Receivable confirmation failed:", error);
         confirmationWarning =
           error instanceof Error ? `Confirmation failed: ${error.message}` : "Could not auto-confirm receivable.";
 
+        try {
+          receivable = await refetchReceivable(
+            parsed.data.exporterAccountId,
+            createdReceivable.id,
+            2,
+          );
+        } catch (refreshError) {
+          console.error("Receivable refresh after confirmation failure failed:", refreshError);
+        }
+
         // Check if receivable has system messages explaining why it can't be confirmed
         if (receivable.system_message && receivable.system_message.length > 0) {
-          const systemMessages = receivable.system_message.map(msg => `${msg.code}: ${msg.message}`).join("; ");
+          const systemMessages = receivable.system_message
+            .map((msg) => `${msg.code}: ${msg.message}`)
+            .join("; ");
           confirmationWarning += ` System messages: ${systemMessages}`;
         }
       }

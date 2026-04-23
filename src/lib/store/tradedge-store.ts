@@ -3,11 +3,12 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import type { ExporterProfile, InvoiceRecord } from "@/types/tradedge";
+import type { ExporterProfile, InvoiceRecord, PartnerRecord } from "@/types/tradedge";
 
 type TradEdgeStore = {
   exporter: ExporterProfile | null;
   invoices: InvoiceRecord[];
+  partners: PartnerRecord[];
   session: {
     email: string;
     isAuthenticated: boolean;
@@ -18,6 +19,7 @@ type TradEdgeStore = {
   signIn: (email: string) => void;
   signOut: () => void;
   upsertInvoice: (invoice: InvoiceRecord) => void;
+  upsertPartner: (partner: PartnerRecord) => void;
   updateInvoice: (invoiceId: string, patch: Partial<InvoiceRecord>) => void;
 };
 
@@ -27,11 +29,18 @@ function sortInvoices(invoices: InvoiceRecord[]) {
   );
 }
 
+function sortPartners(partners: PartnerRecord[]) {
+  return [...partners].sort(
+    (left, right) => new Date(right.updatedAt).valueOf() - new Date(left.updatedAt).valueOf(),
+  );
+}
+
 export const useTradEdgeStore = create<TradEdgeStore>()(
   persist(
     (set) => ({
       exporter: null,
       invoices: [],
+      partners: [],
       session: {
         email: "",
         isAuthenticated: false,
@@ -40,6 +49,7 @@ export const useTradEdgeStore = create<TradEdgeStore>()(
         set(() => ({
           exporter: null,
           invoices: [],
+          partners: [],
           session: {
             email: "",
             isAuthenticated: false,
@@ -69,6 +79,13 @@ export const useTradEdgeStore = create<TradEdgeStore>()(
           invoices: sortInvoices([
             invoice,
             ...state.invoices.filter((item) => item.id !== invoice.id),
+          ]),
+        })),
+      upsertPartner: (partner) =>
+        set((state) => ({
+          partners: sortPartners([
+            partner,
+            ...state.partners.filter((item) => item.id !== partner.id),
           ]),
         })),
       updateInvoice: (invoiceId, patch) =>

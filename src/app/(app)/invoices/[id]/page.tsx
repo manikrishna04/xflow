@@ -1,4 +1,4 @@
-import { InvoiceDetailScreen } from "@/components/screens/invoice-detail-screen";
+import { redirect } from "next/navigation";
 
 export default async function InvoiceDetailPage({
   params,
@@ -7,5 +7,5 @@ export default async function InvoiceDetailPage({
 }) {
   const { id } = await params;
 
-  return <InvoiceDetailScreen invoiceId={id} />;
+  redirect(`/receivables/${id}`);
 }

@@ -82,13 +82,53 @@ export const payoutBankSchema = z.object({
   state: z.string().trim().min(2, "Enter the state."),
 });
 
+const metadataSchema = z.record(z.string().trim().min(1), z.string().trim().max(500));
+const isoDateSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Date must use YYYY-MM-DD.");
+
+export const partnerAddressSchema = z.object({
+  city: z.string().trim().min(2, "Enter city."),
+  country: countryCodeSchema,
+  line1: z.string().trim().min(4, "Enter address line 1."),
+  line2: z.string().trim().max(120).optional().or(z.literal("")),
+  postalCode: z.string().trim().min(3, "Enter zipcode."),
+  state: z.string().trim().min(2, "Enter state / province / region."),
+});
+
 export const invoiceFormSchema = z.object({
   amountUsd: z
     .number({ error: "Enter a valid USD amount." })
     .positive("Amount must be greater than zero.")
     .max(1_000_000, "Amount is too large for the demo flow."),
-  buyerCountry: countryCodeSchema,
-  buyerName: z.string().trim().min(2, "Enter the buyer's company name."),
+  description: z.string().trim().max(255).optional(),
+  dueDate: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Due date must use YYYY-MM-DD."),
+  invoiceDate: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Invoice date must use YYYY-MM-DD."),
+  invoiceDocumentId: z.string().trim().min(1).optional(),
+  invoiceNumber: z.string().trim().min(1, "Enter invoice number."),
+  metadata: metadataSchema.optional(),
+  partnerDetails: z.object({
+    address: partnerAddressSchema,
+    country: countryCodeSchema,
+    email: z.email("Add partner email."),
+    legalName: z.string().trim().min(2, "Enter partner legal name."),
+    metadata: metadataSchema.optional(),
+    nickname: z.string().trim().min(2, "Enter partner nickname."),
+    partnerType: z.enum(["company", "individual"], {
+      message: "Select partner type.",
+    }),
+  }),
+  purposeCode: z.string().trim().min(1, "Select purpose code."),
+  transactionType: z.enum(["goods", "services", "software"], {
+    message: "Select partner transaction type.",
+  }),
 });
 
 export const createPartnerSchema = z.object({
@@ -98,19 +138,49 @@ export const createPartnerSchema = z.object({
   referenceId: z.string().trim().min(1),
 });
 
+export const createPartnerAccountSchema = z.object({
+  address: partnerAddressSchema,
+  country: countryCodeSchema,
+  email: z.email("Add partner email."),
+  exporterAccountId: z.string().trim().min(1),
+  legalName: z.string().trim().min(2),
+  metadata: metadataSchema.optional(),
+  nickname: z.string().trim().min(2),
+  partnerType: z.enum(["company", "individual"]),
+});
+
 export const createReceivableSchema = z.object({
   amountUsd: z.number().positive(),
+  description: z.string().trim().max(255).optional(),
+  dueDate: isoDateSchema.optional(),
   exporterAccountId: z.string().trim().min(1),
   invoiceId: z.string().trim().min(1),
+  invoiceDocumentId: z.string().trim().min(1).optional(),
+  invoiceNumber: z.string().trim().min(1),
+  invoiceDate: isoDateSchema,
+  metadata: metadataSchema.optional(),
   partnerId: z.string().trim().min(1),
   referenceId: z.string().trim().min(1),
   transactionType: z.enum(["goods", "services", "software"]),
   purposeCode: z.string().trim().min(1),
-  invoiceNumber: z.string().trim().min(1),
-  description: z.string().trim().optional(),
-  invoiceDate: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Invoice date must use YYYY-MM-DD."),
-  dueDate: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, "Due date must use YYYY-MM-DD."),
-  metadata: z.record(z.string(), z.string().trim().max(500)).optional(),
+});
+
+export const receivableFormSchema = z.object({
+  amountUsd: z
+    .number({ error: "Enter a valid USD amount." })
+    .positive("Amount must be greater than zero.")
+    .max(1_000_000, "Amount is too large for the demo flow."),
+  description: z.string().trim().max(255).optional(),
+  dueDate: isoDateSchema.optional(),
+  invoiceDate: isoDateSchema,
+  invoiceDocumentId: z.string().trim().min(1).optional(),
+  invoiceNumber: z.string().trim().min(1, "Enter invoice number."),
+  metadata: metadataSchema.optional(),
+  partnerId: z.string().trim().min(1, "Select a partner."),
+  purposeCode: z.string().trim().min(1, "Select purpose code."),
+  transactionType: z.enum(["goods", "services", "software"], {
+    message: "Select transaction type.",
+  }),
 });
 
 export const simulatePaymentSchema = z.object({
@@ -122,6 +192,25 @@ export const createPayoutSchema = z.object({
   amountInr: z.number().positive(),
   exporterAccountId: z.string().trim().min(1),
   referenceId: z.string().trim().min(1),
+});
+
+export const previewReceivableReconciliationSchema = z.object({
+  addressId: z.string().trim().min(1).optional(),
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),
+  exporterAccountId: z.string().trim().min(1),
+  liveFx: z.enum(["enabled", "disabled"]).optional(),
+  receivableId: z.string().trim().min(1),
+  reconciliationTime: z.number().int().positive().optional(),
+});
+
+export const reconcileReceivableSchema = z.object({
+  addressId: z.string().trim().min(1).optional(),
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),
+  debitAccountId: z.string().trim().min(1).optional(),
+  exporterAccountId: z.string().trim().min(1),
+  liveFx: z.enum(["enabled", "disabled"]).optional(),
+  quoteLockId: z.string().trim().min(1).optional(),
+  receivableId: z.string().trim().min(1),
 });
 
 export const statusRequestSchema = z.object({
