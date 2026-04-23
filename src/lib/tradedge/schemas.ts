@@ -194,6 +194,35 @@ export const createPayoutSchema = z.object({
   referenceId: z.string().trim().min(1),
 });
 
+export const listPayoutsSchema = z.object({
+  accountId: z.string().trim().min(1),
+  createdEq: z.coerce.number().int().positive().optional(),
+  createdGt: z.coerce.number().int().positive().optional(),
+  createdGte: z.coerce.number().int().positive().optional(),
+  createdLt: z.coerce.number().int().positive().optional(),
+  createdLte: z.coerce.number().int().positive().optional(),
+  endingBefore: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(10).optional(),
+  startingAfter: z.string().trim().min(1).optional(),
+  status: z
+    .union([
+      z.string().trim().min(1),
+      z.array(z.string().trim().min(1)),
+    ])
+    .optional(),
+  toAccountId: z.string().trim().min(1).optional(),
+  toAddressId: z.string().trim().min(1).optional(),
+});
+
+export const retrievePayoutSchema = z.object({
+  accountId: z.string().trim().min(1),
+});
+
+export const updatePayoutMetadataSchema = z.object({
+  accountId: z.string().trim().min(1),
+  metadata: metadataSchema,
+});
+
 export const previewReceivableReconciliationSchema = z.object({
   addressId: z.string().trim().min(1).optional(),
   amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),

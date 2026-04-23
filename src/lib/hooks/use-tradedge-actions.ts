@@ -21,6 +21,7 @@ import type {
 import type {
   XflowAccount,
   XflowBalance,
+  XflowList,
   XflowPayout,
   XflowReceivable,
   XflowTransfer,
@@ -47,6 +48,14 @@ type SimulatePaymentResponse = {
 };
 
 type CreatePayoutResponse = {
+  payout: XflowPayout;
+};
+
+type PayoutListResponse = {
+  payouts: XflowList<XflowPayout>;
+};
+
+type PayoutResponse = {
   payout: XflowPayout;
 };
 
@@ -767,6 +776,108 @@ export function useCreatePayoutMutation(invoice?: InvoiceRecord | null) {
 
       void queryClient.invalidateQueries({
         queryKey: ["invoice-status", invoice.id],
+      });
+    },
+  });
+}
+
+export function usePayoutsQuery(input: {
+  accountId?: string | null;
+  createdGt?: number;
+  limit?: number;
+  startingAfter?: string;
+  status?: string;
+}) {
+  return useQuery({
+    enabled: Boolean(input.accountId),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("accountId", input.accountId ?? "");
+      params.set("limit", String(input.limit ?? 10));
+
+      if (input.createdGt) {
+        params.set("created.gt", String(input.createdGt));
+      }
+
+      if (input.startingAfter) {
+        params.set("starting_after", input.startingAfter);
+      }
+
+      if (input.status && input.status !== "all") {
+        params.set("status", input.status);
+      }
+
+      const response = await apiRequest<PayoutListResponse>(
+        `/api/xflow/payouts?${params.toString()}`,
+      );
+
+      return response.payouts;
+    },
+    queryKey: [
+      "payouts",
+      input.accountId,
+      input.createdGt ?? "all-time",
+      input.limit ?? 10,
+      input.startingAfter ?? "first-page",
+      input.status ?? "all",
+    ],
+    refetchInterval: (queryState) => {
+      const payouts = (queryState.state.data as XflowList<XflowPayout> | undefined)?.data ?? [];
+      const hasActivePayout = payouts.some((payout) =>
+        ["initialized", "processing", "hold"].includes((payout.status || "").toLowerCase()),
+      );
+
+      return hasActivePayout ? 12_000 : false;
+    },
+    staleTime: 8_000,
+  });
+}
+
+export function usePayoutQuery(payoutId?: string | null, accountId?: string | null) {
+  return useQuery({
+    enabled: Boolean(payoutId && accountId),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        accountId: accountId ?? "",
+      });
+      const response = await apiRequest<PayoutResponse>(
+        `/api/xflow/payouts/${payoutId}?${params.toString()}`,
+      );
+
+      return response.payout;
+    },
+    queryKey: ["payout", accountId, payoutId],
+    refetchInterval: (queryState) => {
+      const payout = queryState.state.data as XflowPayout | undefined;
+      const status = (payout?.status || "").toLowerCase();
+
+      return ["initialized", "processing", "hold"].includes(status) ? 12_000 : false;
+    },
+    staleTime: 8_000,
+  });
+}
+
+export function useUpdatePayoutMetadataMutation(payoutId?: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      accountId: string;
+      metadata: Record<string, string>;
+    }) => {
+      if (!payoutId) {
+        throw new Error("Payout id is missing.");
+      }
+
+      return apiPost<PayoutResponse, typeof input>(
+        `/api/xflow/payouts/${payoutId}`,
+        input,
+      );
+    },
+    onSuccess: ({ payout }, input) => {
+      queryClient.setQueryData(["payout", input.accountId, payout.id], payout);
+      void queryClient.invalidateQueries({
+        queryKey: ["payouts", input.accountId],
       });
     },
   });
