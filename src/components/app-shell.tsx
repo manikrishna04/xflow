@@ -9,6 +9,7 @@ import {
   PlusCircle,
   ShieldEllipsis,
   Users,
+  WalletCards,
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -23,6 +24,7 @@ const navigationItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/onboarding", icon: ShieldEllipsis, label: "Onboarding" },
   { href: "/receivables", icon: FileText, label: "Receivables" },
+  { href: "/payouts", icon: WalletCards, label: "Payouts" },
   { href: "/partners", icon: Users, label: "Partners" },
 ];
 
@@ -39,6 +41,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith("/receivables/new")) return "Create receivable";
     if (pathname.startsWith("/receivables/")) return "Receivable control room";
     if (pathname.startsWith("/receivables")) return "Receivables ledger";
+    if (pathname.startsWith("/payouts/")) return "Payout tracker";
+    if (pathname.startsWith("/payouts")) return "Payouts";
     if (pathname.startsWith("/partners/new")) return "Add partner";
     if (pathname.startsWith("/partners")) return "Partners";
 
