@@ -1,5 +1,11 @@
 import type { ConnectedUserSnapshot, OnboardingRequirement } from "@/types/tradedge";
-import type { XflowAccount, XflowAddress, XflowPerson } from "@/types/xflow";
+import type {
+  XflowAccount,
+  XflowAddress,
+  XflowBalance,
+  XflowPerson,
+  XflowTransfer,
+} from "@/types/xflow";
 
 function isPresent(value: string | null | undefined) {
   return Boolean(value && value.trim());
@@ -359,6 +365,12 @@ export function buildConnectedUserSnapshot(
   account: XflowAccount,
   payoutAddresses: XflowAddress[],
   persons: XflowPerson[] = [],
+  options?: {
+    balance?: XflowBalance | null;
+    recentTopups?: XflowTransfer[];
+    topUpSourceAccountId?: string | null;
+    treasuryWarning?: string | null;
+  },
 ): ConnectedUserSnapshot {
   const requirementChecklist = getOnboardingRequirementChecklist(account, payoutAddresses, persons);
   const requiredItems = requirementChecklist
@@ -373,6 +385,7 @@ export function buildConnectedUserSnapshot(
 
   return {
     account,
+    balance: options?.balance ?? null,
     payoutAddresses,
     persons,
     progress: {
@@ -380,8 +393,11 @@ export function buildConnectedUserSnapshot(
       percent: Math.round((completed / total) * 100),
       total,
     },
+    recentTopups: options?.recentTopups ?? [],
     requiredItems,
     statusLabel: formatConnectedUserStatus(account.status),
+    topUpSourceAccountId: options?.topUpSourceAccountId ?? null,
+    treasuryWarning: options?.treasuryWarning ?? null,
     transactionsEnabled: isConnectedUserActive(account.status),
   };
 }

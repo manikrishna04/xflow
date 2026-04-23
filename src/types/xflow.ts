@@ -13,6 +13,11 @@ export type XflowAccountPurposeCode = {
   status?: string | null;
 };
 
+export type XflowMoneyAmount = {
+  amount?: string | null;
+  currency?: string | null;
+};
+
 export type XflowAccount = {
   id: string;
   address?: string | null;
@@ -235,3 +240,37 @@ export type XflowReceivableReconciliation = {
     address_id?: string | null;
   } | null;
 } & Record<string, unknown>;
+
+export type XflowBalance = {
+  account_id?: string | null;
+  available?: XflowMoneyAmount[] | null;
+  fee_advance?: XflowMoneyAmount[] | null;
+  livemode?: boolean | null;
+  object?: string;
+  payout_processing?: XflowMoneyAmount[] | null;
+  pending?: XflowMoneyAmount[] | null;
+  processing?: XflowMoneyAmount[] | null;
+};
+
+export type XflowTransfer = {
+  created?: number | null;
+  description?: string | null;
+  from?: {
+    account_id?: string | null;
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  id: string;
+  linked_id?: string | null;
+  linked_object?: string | null;
+  livemode?: boolean | null;
+  metadata?: Record<string, string> | null;
+  object?: string;
+  status?: string | null;
+  to?: {
+    account_id?: string | null;
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  type?: string | null;
+};

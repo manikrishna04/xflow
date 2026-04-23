@@ -1,9 +1,11 @@
 import type {
   XflowAccount,
   XflowAddress,
+  XflowBalance,
   XflowPayout,
   XflowPerson,
   XflowReceivable,
+  XflowTransfer,
 } from "@/types/xflow";
 
 export type ExporterProfile = {
@@ -102,6 +104,7 @@ export type OnboardingRequirement = {
 
 export type ConnectedUserSnapshot = {
   account: XflowAccount;
+  balance: XflowBalance | null;
   payoutAddresses: XflowAddress[];
   persons: XflowPerson[];
   progress: {
@@ -109,7 +112,10 @@ export type ConnectedUserSnapshot = {
     percent: number;
     total: number;
   };
+  recentTopups: XflowTransfer[];
   requiredItems: OnboardingRequirement[];
   statusLabel: string;
+  topUpSourceAccountId: string | null;
+  treasuryWarning?: string | null;
   transactionsEnabled: boolean;
 };
