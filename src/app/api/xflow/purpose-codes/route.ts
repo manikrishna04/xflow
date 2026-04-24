@@ -1,11 +1,5 @@
-import { NextResponse } from "next/server";
+import { proxyXflowMicroservice } from "@/lib/xflow/microservice-proxy";
 
-import { XFLOW_EXPORT_PURPOSE_CODES } from "@/lib/tradedge/purpose-codes";
-
-export const dynamic = "force-static";
-
-export async function GET() {
-  return NextResponse.json({
-    purposeCodes: XFLOW_EXPORT_PURPOSE_CODES,
-  });
+export async function GET(request: Request) {
+  return proxyXflowMicroservice(request, "/purpose-codes");
 }

@@ -142,8 +142,9 @@ export function LoginScreen() {
                 </p>
               </div>
               <p className="mt-3 text-sm leading-7 text-foreground/70">
-                Every Xflow request is proxied through `app/api/xflow/*`, so no
-                secret or admin context leaks into the browser bundle.
+                Every Xflow request still goes through `app/api/xflow/*`, but those
+                routes now forward to `tradedge-fastapi` so the Xflow secret lives
+                in the backend service instead of the Next.js app.
               </p>
             </div>
             <div className="rounded-[28px] bg-[rgba(255,167,38,0.12)] p-5">
@@ -199,7 +200,7 @@ export function LoginScreen() {
             </h2>
             <p className="mt-3 text-sm leading-7 text-foreground/68">
               Enter a connected-user account id. We will validate it through our
-              server route, restore that exporter workspace, and keep the session in
+              proxy route, restore that exporter workspace, and keep the session in
               local storage for the demo flow.
             </p>
 

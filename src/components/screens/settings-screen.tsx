@@ -73,15 +73,16 @@ export function SettingsScreen() {
               <div>
                 <h2 className="text-2xl font-semibold">Security posture</h2>
                 <p className="mt-1 text-sm text-foreground/65">
-                  Server routes read `XFLOW_SECRET_KEY`, `XFLOW_API_BASE`, and the platform account
-                  id for treasury actions. The browser only sees JSON responses.
+                  Next.js now forwards `/api/xflow/*` traffic to `tradedge-fastapi` using
+                  `XFLOW_MICROSERVICE_BASE_URL`. The browser still only sees JSON responses, while
+                  the Xflow secret stays inside the FastAPI service.
                 </p>
               </div>
             </div>
             <div className="mt-6 space-y-3 text-sm leading-7 text-foreground/68">
-              <div>`/api/xflow/*` routes are our own Next.js proxy routes, not direct browser calls to Xflow.</div>
-              <div>The connected-user onboarding flow now creates the account, directors, bank details, and activation request from the server side.</div>
-              <div>Balance top-ups use a server-side `platform_debit` transfer and require `XFLOW_PARENT_ACCOUNT_ID` or `XFLOW_PLATFORM_ACCOUNT_ID`.</div>
+              <div>`/api/xflow/*` stays stable in the frontend, but the route handlers now proxy to `tradedge-fastapi` instead of talking to Xflow directly.</div>
+              <div>The connected-user onboarding flow creates the account, directors, bank details, and activation request from the FastAPI microservice.</div>
+              <div>Balance top-ups still depend on `XFLOW_PARENT_ACCOUNT_ID` or `XFLOW_PLATFORM_ACCOUNT_ID`, but those values now belong on the FastAPI service.</div>
               <div>No database is used. Exporter state and invoices persist in local storage for this demo.</div>
               <div>The buyer pay page is public, but it still depends on the same browser session&apos;s local data.</div>
             </div>
