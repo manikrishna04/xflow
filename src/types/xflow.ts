@@ -188,12 +188,18 @@ export type XflowReceivable = {
 export type XflowPayout = {
   amount?: string | null;
   arrival_date?: number | null;
+  automatic?: boolean | null;
   created?: number;
   currency?: string | null;
   id: string;
+  livemode?: boolean | null;
   metadata?: Record<string, string> | null;
   object?: string;
   payment_method?: string | null;
+  payment_method_details?: {
+    payout_confirmation?: string | null;
+    statement_descriptor?: string | null;
+  } | null;
   payout_confirmation?: string | null;
   statement_descriptor?: string | null;
   status?: string | null;
@@ -203,6 +209,12 @@ export type XflowPayout = {
   } | null;
   tracking_info?: string | null;
   unique_transaction_reference?: string | null;
+};
+
+export type XflowList<T> = {
+  data: T[];
+  has_next?: boolean | null;
+  object?: "list" | string;
 };
 
 export type XflowFile = {
