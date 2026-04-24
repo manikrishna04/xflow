@@ -239,6 +239,62 @@ export type XflowReceivableReconciliation = {
   to?: {
     address_id?: string | null;
   } | null;
+  } & Record<string, unknown>;
+
+export type XflowQuote = {
+  buy?: {
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  currency_pair?: string | null;
+  dealt_currency?: string | null;
+  fee_plan_id?: string | null;
+  livemode?: boolean | null;
+  object?: string | null;
+  rate?: {
+    inter_bank?: string | null;
+    mid_market?: string | null;
+    user?: string | null;
+    valid_from?: number | null;
+    valid_to?: number | null;
+  } | null;
+  sell?: {
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  type?: string | null;
+} & Record<string, unknown>;
+
+export type XflowQuoteLock = {
+  account_id?: string | null;
+  buy?: {
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  confirm_before?: number | string | null;
+  created?: number | string | null;
+  id: string;
+  livemode?: boolean | null;
+  lock_amount?: {
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  lock_duration?: string | null;
+  lock_type?: string | null;
+  object?: string | null;
+  rate?: {
+    inter_bank?: string | null;
+    mid_market?: string | null;
+    user?: string | null;
+  } | null;
+  sell?: {
+    amount?: string | null;
+    currency?: string | null;
+  } | null;
+  status?: string | null;
+  type?: string | null;
+  valid_from?: number | string | null;
+  valid_to?: number | string | null;
 } & Record<string, unknown>;
 
 export type XflowBalance = {

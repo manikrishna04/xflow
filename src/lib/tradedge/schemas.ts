@@ -213,6 +213,23 @@ export const reconcileReceivableSchema = z.object({
   receivableId: z.string().trim().min(1),
 });
 
+export const receivableQuoteSchema = z.object({
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),
+  buyCurrency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+  exporterAccountId: z.string().trim().min(1),
+  sellCurrency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+  type: z.enum(["payout_fx", "transfer_fx"]).default("payout_fx"),
+});
+
+export const receivableQuoteLockSchema = z.object({
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),
+  buyCurrency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+  exporterAccountId: z.string().trim().min(1),
+  lockDuration: z.enum(["120"]).default("120"),
+  sellCurrency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+  type: z.literal("payout_fx").default("payout_fx"),
+});
+
 export const statusRequestSchema = z.object({
   exporterAccountId: z.string().trim().min(1),
   payoutId: z.string().trim().optional(),

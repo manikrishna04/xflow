@@ -4,7 +4,10 @@ import type {
   XflowBalance,
   XflowPayout,
   XflowPerson,
+  XflowQuote,
+  XflowQuoteLock,
   XflowReceivable,
+  XflowReceivableReconciliation,
   XflowTransfer,
 } from "@/types/xflow";
 
@@ -65,11 +68,22 @@ export type InvoiceRecord = {
   payoutId?: string | null;
   payoutSnapshot?: XflowPayout | null;
   payoutStatus?: string | null;
+  receivableReconciliationSnapshot?: XflowReceivableReconciliation | null;
   receivableId: string;
   receivableSnapshot?: XflowReceivable | null;
   receivableStatus?: string | null;
   referenceId: string;
   updatedAt: string;
+};
+
+export type ReceivableQuoteSnapshot = {
+  fetchedAt: string;
+  quote: XflowQuote;
+};
+
+export type ReceivableQuoteLockSnapshot = {
+  createdAt: string;
+  quoteLock: XflowQuoteLock;
 };
 
 export type RemoteStatusSnapshot = {

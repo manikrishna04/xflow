@@ -1,4 +1,4 @@
-import { InvoiceDetailScreen } from "@/components/screens/invoice-detail-screen";
+import { ReceivableDetailScreen } from "@/components/screens/receivable-detail-screen";
 
 export default async function ReceivableDetailPage({
   params,
@@ -7,5 +7,5 @@ export default async function ReceivableDetailPage({
 }) {
   const { id } = await params;
 
-  return <InvoiceDetailScreen basePath="/receivables" invoiceId={id} variant="receivable" />;
+  return <ReceivableDetailScreen invoiceId={id} />;
 }

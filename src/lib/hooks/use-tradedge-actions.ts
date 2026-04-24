@@ -16,13 +16,18 @@ import type {
   ExporterProfile,
   InvoiceRecord,
   PartnerRecord,
+  ReceivableQuoteLockSnapshot,
+  ReceivableQuoteSnapshot,
   RemoteStatusSnapshot,
 } from "@/types/tradedge";
 import type {
   XflowAccount,
   XflowBalance,
   XflowPayout,
+  XflowQuote,
+  XflowQuoteLock,
   XflowReceivable,
+  XflowReceivableReconciliation,
   XflowTransfer,
 } from "@/types/xflow";
 
@@ -48,6 +53,19 @@ type SimulatePaymentResponse = {
 
 type CreatePayoutResponse = {
   payout: XflowPayout;
+};
+
+type ReceivableQuoteResponse = {
+  quote: XflowQuote;
+};
+
+type ReceivableQuoteLockResponse = {
+  quoteLock: XflowQuoteLock;
+};
+
+type ReconcileReceivableResponse = {
+  receivable: XflowReceivable;
+  reconciliation: XflowReceivableReconciliation;
 };
 
 type PurposeCodesResponse = {
@@ -684,6 +702,158 @@ export function useCreatePartnerAccountMutation() {
     },
     onSuccess: ({ activationWarning, partner }) => {
       upsertPartner(buildPartnerRecord(partner, activationWarning));
+    },
+  });
+}
+
+export function useReceivableQuoteQuery(options: {
+  amount?: string;
+  buyCurrency?: string;
+  enabled?: boolean;
+  exporterAccountId?: string | null;
+  sellCurrency?: string;
+}) {
+  return useQuery({
+    enabled:
+      (options.enabled ?? true) &&
+      Boolean(
+        options.exporterAccountId &&
+          options.amount &&
+          options.buyCurrency &&
+          options.sellCurrency,
+      ),
+    queryFn: async () => {
+      if (
+        !options.exporterAccountId ||
+        !options.amount ||
+        !options.buyCurrency ||
+        !options.sellCurrency
+      ) {
+        throw new Error("Receivable quote inputs are incomplete.");
+      }
+
+      const response = await apiPost<
+        ReceivableQuoteResponse,
+        {
+          amount: string;
+          buyCurrency: string;
+          exporterAccountId: string;
+          sellCurrency: string;
+          type: "payout_fx";
+        }
+      >("/api/xflow/quotes", {
+        amount: options.amount,
+        buyCurrency: options.buyCurrency,
+        exporterAccountId: options.exporterAccountId,
+        sellCurrency: options.sellCurrency,
+        type: "payout_fx",
+      });
+
+      return {
+        fetchedAt: new Date().toISOString(),
+        quote: response.quote,
+      } satisfies ReceivableQuoteSnapshot;
+    },
+    queryKey: [
+      "receivable-quote",
+      options.exporterAccountId,
+      options.amount,
+      options.sellCurrency,
+      options.buyCurrency,
+    ],
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+}
+
+export function useCreateQuoteLockMutation(invoice?: InvoiceRecord | null) {
+  return useMutation({
+    mutationFn: async (input: {
+      amount: string;
+      buyCurrency: string;
+      exporterAccountId: string;
+      sellCurrency: string;
+    }) => {
+      const response = await apiPost<
+        ReceivableQuoteLockResponse,
+        {
+          amount: string;
+          buyCurrency: string;
+          exporterAccountId: string;
+          lockDuration: "120";
+          sellCurrency: string;
+          type: "payout_fx";
+        }
+      >("/api/xflow/quote-locks", {
+        amount: input.amount,
+        buyCurrency: input.buyCurrency,
+        exporterAccountId: input.exporterAccountId,
+        lockDuration: "120",
+        sellCurrency: input.sellCurrency,
+        type: "payout_fx",
+      });
+
+      return {
+        createdAt: new Date().toISOString(),
+        quoteLock: response.quoteLock,
+      } satisfies ReceivableQuoteLockSnapshot;
+    },
+    mutationKey: ["create-quote-lock", invoice?.id ?? "no-invoice"],
+  });
+}
+
+export function useReconcileReceivableMutation(invoice?: InvoiceRecord | null) {
+  const updateInvoice = useTradEdgeStore((state) => state.updateInvoice);
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      addressId?: string;
+      amount: string;
+      liveFx?: "enabled" | "disabled";
+      quoteLockId?: string;
+    }) => {
+      if (!invoice) {
+        throw new Error("Receivable not found.");
+      }
+
+      return apiPost<
+        ReconcileReceivableResponse,
+        {
+          addressId?: string;
+          amount: string;
+          debitAccountId: string;
+          exporterAccountId: string;
+          liveFx?: "enabled" | "disabled";
+          quoteLockId?: string;
+          receivableId: string;
+        }
+      >("/api/xflow/receivables/reconcile", {
+        addressId: input.addressId,
+        amount: input.amount,
+        debitAccountId: invoice.exporterAccountId,
+        exporterAccountId: invoice.exporterAccountId,
+        liveFx: input.liveFx,
+        quoteLockId: input.quoteLockId,
+        receivableId: invoice.receivableId,
+      });
+    },
+    onSuccess: ({ receivable, reconciliation }) => {
+      if (!invoice) {
+        return;
+      }
+
+      updateInvoice(invoice.id, {
+        lastSyncedAt: new Date().toISOString(),
+        receivableReconciliationSnapshot: reconciliation,
+        receivableSnapshot: receivable,
+        receivableStatus: receivable.status ?? invoice.receivableStatus ?? "pending",
+        updatedAt: new Date().toISOString(),
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: ["invoice-status", invoice.id],
+      });
     },
   });
 }

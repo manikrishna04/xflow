@@ -146,6 +146,7 @@ export function buildInvoiceRecord(input: {
     payoutId: null,
     payoutSnapshot: null,
     payoutStatus: null,
+    receivableReconciliationSnapshot: null,
     receivableId: input.receivable.id,
     receivableSnapshot: input.receivable,
     receivableStatus: input.receivable.status ?? "pending",
