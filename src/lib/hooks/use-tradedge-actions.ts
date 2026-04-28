@@ -32,6 +32,10 @@ import type {
   XflowTransfer,
 } from "@/types/xflow";
 
+type PartnersResponse = {
+  partners: XflowAccount[];
+};
+
 type CreateAccountResponse = {
   account: XflowAccount;
 };
@@ -713,6 +717,60 @@ export function useCreatePartnerAccountMutation() {
       upsertPartner(buildPartnerRecord(partner, activationWarning));
     },
   });
+}
+
+export function usePartnersSyncQuery(options: {
+  enabled?: boolean;
+  accountId?: string | null;
+} = {}) {
+  const setPartners = useTradEdgeStore((state) => state.setPartners);
+
+  const query = useQuery({
+    enabled: options.enabled ?? true,
+    queryKey: ["partners", options.accountId ?? null],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (options.accountId) {
+        searchParams.set("accountId", options.accountId);
+      }
+      const suffix = searchParams.toString();
+      const response = await apiRequest<PartnersResponse>(
+        `/api/xflow/partners${suffix ? `?${suffix}` : ""}`,
+      );
+      return response.partners;
+    },
+    refetchInterval: (queryState) => {
+      const partners = queryState.state.data as XflowAccount[] | undefined;
+
+      if (!partners || partners.length === 0) {
+        return false;
+      }
+
+      // Keep polling while any partner is still verifying so the UI converges to activated.
+      return partners.some((partner) => partner.status?.toLowerCase?.() === "verifying")
+        ? 10_000
+        : false;
+    },
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    if (!query.data) {
+      return;
+    }
+
+    const existing = useTradEdgeStore.getState().partners;
+    const existingById = new Map(existing.map((record) => [record.id, record]));
+
+    setPartners(
+      query.data.map((partner) => {
+        const prior = existingById.get(partner.id);
+        return buildPartnerRecord(partner, prior?.activationWarning ?? null);
+      }),
+    );
+  }, [query.data, setPartners]);
+
+  return query;
 }
 
 export function useReceivableQuoteQuery(options: {

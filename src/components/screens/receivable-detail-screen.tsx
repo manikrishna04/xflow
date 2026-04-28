@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FileText,
   Landmark,
+  X,
   RefreshCcw,
   Send,
 } from "lucide-react";
@@ -19,11 +20,13 @@ import { PageHeader } from "@/components/page-header";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { formatCurrency, formatDate, formatDateTime, parseCurrencyAmount } from "@/lib/tradedge/format";
 import { getPartnerCountry, getPartnerLegalName } from "@/lib/tradedge/partners";
-import { useSyncInvoiceStatusMutation } from "@/lib/hooks/use-tradedge-actions";
+import { useConnectedUserQuery, useSyncInvoiceStatusMutation } from "@/lib/hooks/use-tradedge-actions";
 import { useHydrated } from "@/lib/hooks/use-hydrated";
 import { useTradEdgeStore } from "@/lib/store/tradedge-store";
+import type { XflowAddress } from "@/types/xflow";
 
 function getReceivableTotalAmount(amount?: string | null) {
   return parseCurrencyAmount(amount);
@@ -67,6 +70,165 @@ function metadataEntries(metadata?: Record<string, string> | null) {
   return Object.entries(metadata ?? {}).filter(([, value]) => value);
 }
 
+function chooseBestPayoutAddress(addresses: XflowAddress[], currency?: string | null) {
+  if (addresses.length === 0) {
+    return null;
+  }
+
+  const normalizedCurrency = (currency || "").toUpperCase();
+  const currencyMatch = normalizedCurrency
+    ? addresses.find((address) => (address.currency || "").toUpperCase() === normalizedCurrency)
+    : undefined;
+
+  return currencyMatch ?? addresses[0] ?? null;
+}
+
+function formatCountryName(code?: string | null) {
+  const normalized = (code || "").toUpperCase();
+  switch (normalized) {
+    case "US":
+      return "United States of America";
+    case "IN":
+      return "India";
+    case "GB":
+      return "United Kingdom";
+    case "AE":
+      return "United Arab Emirates";
+    case "SG":
+      return "Singapore";
+    default:
+      return normalized || "N/A";
+  }
+}
+
+function formatAddressLine(details?: {
+  city?: string | null;
+  country?: string | null;
+  line1?: string | null;
+  line2?: string | null;
+  postal_code?: string | null;
+  state?: string | null;
+} | null) {
+  if (!details) {
+    return null;
+  }
+
+  const parts = [
+    details.line1,
+    details.line2,
+    details.city,
+    details.state,
+    details.postal_code,
+    details.country ? formatCountryName(details.country) : null,
+  ].filter((value) => Boolean(value && String(value).trim().length > 0));
+
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function getAvailableBalanceDisplay(balance: unknown, currency: string) {
+  if (!balance || typeof balance !== "object") {
+    return null;
+  }
+
+  const candidate = (balance as { available?: Array<{ amount?: string | null; currency?: string | null }> | null })
+    .available;
+  if (!candidate || candidate.length === 0) {
+    return null;
+  }
+
+  const normalized = currency.toUpperCase();
+  const match = candidate.find((item) => (item.currency || "").toUpperCase() === normalized) ?? candidate[0];
+  const amount = Number(match?.amount ?? "");
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  return `${normalized} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+type BankMethodSection = {
+  key: "ach" | "fedwire" | "swift";
+  label: string;
+  rows: Array<{ label: string; value: string }>;
+};
+
+function buildBankMethodSections(params: {
+  payoutAddress: XflowAddress | null;
+  beneficiary?: string | null;
+  receivingCurrency: string;
+  paymentReference?: string | null;
+}): { local: BankMethodSection[]; swift: BankMethodSection[] } {
+  const payoutAddress = params.payoutAddress;
+  if (!payoutAddress) {
+    return { local: [], swift: [] };
+  }
+
+  const bank = payoutAddress.bank_account ?? null;
+  const bankAddress = formatAddressLine(payoutAddress.billing_details ?? null);
+
+  const baseRows: Array<{ label: string; value: string }> = [];
+  if (params.beneficiary) {
+    baseRows.push({ label: "Beneficiary", value: params.beneficiary });
+  }
+  baseRows.push({ label: "Receiving Currency", value: params.receivingCurrency });
+
+  const accountNumber = bank?.number || bank?.last4 ? bank.number || `•••• ${bank.last4}` : null;
+  const accountType = bank?.entity_type || bank?.type || null;
+  const bankName = bank?.bank_name || null;
+
+  const local: BankMethodSection[] = [];
+  const swift: BankMethodSection[] = [];
+
+  // ACH: domestic rails (often the "local" route).
+  if (bank?.domestic_debit || bank?.domestic_credit || accountNumber || bankName) {
+    const rows = [...baseRows];
+    if (accountNumber) rows.push({ label: "Account Number", value: accountNumber });
+    if (bank?.domestic_debit || bank?.domestic_credit) {
+      rows.push({
+        label: "Routing Number",
+        value: String(bank.domestic_debit || bank.domestic_credit),
+      });
+    }
+    if (accountType) rows.push({ label: "Account Type", value: String(accountType) });
+    if (bankName) rows.push({ label: "Bank", value: String(bankName) });
+    if (bankAddress) rows.push({ label: "Bank Address", value: bankAddress });
+    if (params.paymentReference) rows.push({ label: "Payment Reference", value: params.paymentReference });
+
+    local.push({ key: "ach", label: "ACH", rows });
+  }
+
+  // Fedwire: domestic wire.
+  if (bank?.domestic_wire || accountNumber || bankName) {
+    const rows = [...baseRows];
+    if (accountNumber) rows.push({ label: "Account Number", value: accountNumber });
+    if (bank?.domestic_wire) {
+      rows.push({ label: "ABA Code / Routing Number", value: String(bank.domestic_wire) });
+    }
+    if (accountType) rows.push({ label: "Account Type", value: String(accountType) });
+    if (bankName) rows.push({ label: "Bank", value: String(bankName) });
+    if (bankAddress) rows.push({ label: "Bank Address", value: bankAddress });
+    if (params.paymentReference) rows.push({ label: "Payment Reference", value: params.paymentReference });
+
+    local.push({ key: "fedwire", label: "Fedwire", rows });
+  }
+
+  // SWIFT / global wire / IBAN.
+  if (bank?.global_wire || bank?.iban) {
+    const rows = [...baseRows];
+    if (accountNumber) rows.push({ label: "Account Number", value: accountNumber });
+    if (bank?.iban) rows.push({ label: "IBAN", value: String(bank.iban) });
+    if (bank?.global_wire) rows.push({ label: "SWIFT / Global Wire", value: String(bank.global_wire) });
+    if (accountType) rows.push({ label: "Account Type", value: String(accountType) });
+    if (bankName) rows.push({ label: "Bank", value: String(bankName) });
+    if (bankAddress) rows.push({ label: "Bank Address", value: bankAddress });
+    if (params.paymentReference) rows.push({ label: "Payment Reference", value: params.paymentReference });
+
+    swift.push({ key: "swift", label: "SWIFT", rows });
+  }
+
+  return { local, swift };
+}
+
 export function ReceivableDetailScreen({ invoiceId }: { invoiceId: string }) {
   const hydrated = useHydrated();
   const invoice = useTradEdgeStore(
@@ -74,8 +236,37 @@ export function ReceivableDetailScreen({ invoiceId }: { invoiceId: string }) {
   );
   const syncStatus = useSyncInvoiceStatusMutation();
   const [activeTab, setActiveTab] = useState<"transactions" | "payouts">("transactions");
+  const [bankDetailsOpen, setBankDetailsOpen] = useState(false);
+  const [bankTab, setBankTab] = useState<"local" | "swift">("local");
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("USD");
+  const [senderCountry, setSenderCountry] = useState<string>("US");
+  const [selectedSections, setSelectedSections] = useState<Record<string, boolean>>({});
 
   const summary = useMemo(() => (invoice ? buildSummaryMetrics(invoice) : null), [invoice]);
+  const receivableCurrency = invoice?.receivableSnapshot?.currency || "USD";
+
+  const connectedUser = useConnectedUserQuery(
+    bankDetailsOpen && invoice ? invoice.exporterAccountId : null,
+  );
+  const payoutAddress = useMemo(
+    () => chooseBestPayoutAddress(connectedUser.data?.payoutAddresses ?? [], receivableCurrency),
+    [connectedUser.data?.payoutAddresses, receivableCurrency],
+  );
+  const bankSections = useMemo(() => {
+    const paymentReference = invoice?.receivableSnapshot?.reference_id ||
+      invoice?.receivableSnapshot?.invoice?.reference_number ||
+      invoice?.referenceId ||
+      null;
+
+    return buildBankMethodSections({
+      payoutAddress,
+      beneficiary: connectedUser.data?.account?.business_details?.legal_name ?? connectedUser.data?.account?.nickname ?? null,
+      receivingCurrency: selectedCurrency || receivableCurrency,
+      paymentReference,
+    });
+  }, [connectedUser.data?.account?.business_details?.legal_name, connectedUser.data?.account?.nickname, invoice, payoutAddress, receivableCurrency, selectedCurrency]);
+
+  const visibleSections = bankTab === "local" ? bankSections.local : bankSections.swift;
 
   if (hydrated && !invoice) {
     return (
@@ -94,8 +285,8 @@ export function ReceivableDetailScreen({ invoiceId }: { invoiceId: string }) {
 
   const receivable = invoice.receivableSnapshot;
   const partner = invoice.partnerSnapshot;
-  const receivableCurrency = receivable?.currency || "USD";
   const metadata = metadataEntries(receivable?.metadata);
+
   const transactionRows = invoice.receivableReconciliationSnapshot
     ? [
         {
@@ -332,14 +523,266 @@ export function ReceivableDetailScreen({ invoiceId }: { invoiceId: string }) {
                     Share Payment Link
                   </Button>
                 </Link>
-                <a href="#payment-instructions">
-                  <Button variant="outline" className="rounded-[16px]">
-                    Share Bank Transfer Details
-                  </Button>
-                </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-[16px]"
+                  onClick={() => setBankDetailsOpen(true)}
+                >
+                  Share Bank Transfer Details
+                </Button>
               </div>
             </div>
           </SectionCard>
+
+          {bankDetailsOpen ? (
+            <div
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 py-6 md:items-center"
+              role="dialog"
+              aria-modal="true"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  setBankDetailsOpen(false);
+                }
+              }}
+            >
+              <div className="flex max-h-[80vh] w-full max-w-[1040px] flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white shadow-xl">
+                <div className="flex items-center justify-between gap-4 border-b border-black/8 px-6 py-4">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Connected User Balance : Bank Transfer Details
+                  </h3>
+                  <button
+                    type="button"
+                    className="rounded-[12px] p-2 text-foreground/60 transition hover:bg-black/5 hover:text-foreground"
+                    onClick={() => setBankDetailsOpen(false)}
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="grid flex-1 min-h-0 grid-cols-1 overflow-auto md:grid-cols-[360px_1fr] md:overflow-hidden">
+                  <div className="border-b border-black/8 px-6 py-5 md:border-b-0 md:border-r">
+                    <p className="text-sm text-foreground/65">Receiving funds in</p>
+                    <p className="mt-2 text-xl font-semibold text-foreground">Connected User Balance</p>
+
+                    <div className="mt-6">
+                      <p className="text-sm font-semibold text-foreground/70">Currency</p>
+                      <div className="mt-3">
+                        <Select
+                          value={selectedCurrency || receivableCurrency}
+                          onChange={(event) => setSelectedCurrency(event.target.value)}
+                        >
+                          {Array.from(
+                            new Set([
+                              (receivableCurrency || "USD").toUpperCase(),
+                              ...(connectedUser.data?.balance?.available ?? []).map((item) =>
+                                (item.currency || "").toUpperCase(),
+                              ),
+                            ].filter(Boolean)),
+                          ).map((code) => (
+                            <option key={code} value={code}>
+                              {code}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <p className="mt-3 text-sm text-foreground/65">
+                        Available Balance:{" "}
+                        <span className="font-semibold text-foreground">
+                          {getAvailableBalanceDisplay(
+                            connectedUser.data?.balance ?? null,
+                            selectedCurrency || receivableCurrency,
+                          ) ?? "N/A"}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="mt-6">
+                      <p className="text-sm font-semibold text-foreground/70">Sender Country</p>
+                      <div className="mt-3">
+                        <Select value={senderCountry} onChange={(event) => setSenderCountry(event.target.value)}>
+                          {Array.from(
+                            new Set([
+                              (getPartnerCountry(partner) || "US").toUpperCase(),
+                              "US",
+                              "IN",
+                              "GB",
+                              "AE",
+                              "SG",
+                            ].filter(Boolean)),
+                          ).map((code) => (
+                            <option key={code} value={code}>
+                              {formatCountryName(code)}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+
+                    {senderCountry.toUpperCase() === "US" ? (
+                      <div className="mt-6 rounded-[16px] bg-[rgba(105,126,255,0.12)] px-4 py-4 text-sm text-foreground/70">
+                        For US based clients, we recommend that you share both ACH and Fedwire details. Some partners
+                        may not have access to Fedwire.
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="px-6 py-5 md:flex md:min-h-0 md:flex-col">
+                    <p className="text-sm font-semibold text-foreground/70">Recommended Payment Methods</p>
+
+                    <div className="mt-3 inline-flex overflow-hidden rounded-[12px] border border-black/10 bg-white">
+                      {[
+                        { key: "local" as const, label: "Local" },
+                        { key: "swift" as const, label: "SWIFT" },
+                      ].map((tab) => {
+                        const active = bankTab === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            className={`px-4 py-2 text-sm font-semibold transition ${
+                              active ? "bg-primary text-primary-foreground" : "text-foreground/70 hover:bg-black/5"
+                            }`}
+                            onClick={() => setBankTab(tab.key)}
+                          >
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-5 space-y-4 md:min-h-0 md:flex-1 md:overflow-auto md:pr-2">
+                      {connectedUser.isLoading ? (
+                        <p className="text-sm text-foreground/60">Loading bank details…</p>
+                      ) : connectedUser.isError ? (
+                        <p className="text-sm text-foreground/60">
+                          Could not load bank details. Make sure the connected user has a payout address set.
+                        </p>
+                      ) : visibleSections.length === 0 ? (
+                        <p className="text-sm text-foreground/60">No bank transfer details available.</p>
+                      ) : (
+                        visibleSections.map((section) => (
+                          <div
+                            key={section.key}
+                            className="overflow-hidden rounded-[16px] border border-black/10 bg-white"
+                          >
+                            <div className="flex items-center justify-between gap-4 border-b border-black/8 px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <p className="text-base font-semibold text-foreground">{section.label}</p>
+                              </div>
+                              <label className="flex items-center gap-2 text-sm text-foreground/70">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 accent-primary"
+                                  checked={Boolean(selectedSections[section.key])}
+                                  onChange={(event) =>
+                                    setSelectedSections((current) => ({
+                                      ...current,
+                                      [section.key]: event.target.checked,
+                                    }))
+                                  }
+                                />
+                                Select
+                              </label>
+                            </div>
+                            <div className="divide-y divide-black/8">
+                              {section.rows.map((row) => (
+                                <div
+                                  key={`${section.key}-${row.label}`}
+                                  className="grid grid-cols-[1fr_1.2fr] gap-4 px-5 py-3 text-sm"
+                                >
+                                  <p className="text-foreground/70">{row.label}</p>
+                                  <p className="break-all font-semibold text-foreground">{row.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 border-t border-black/8 bg-white px-6 py-4 md:flex-row md:items-center md:justify-between">
+                  <Button type="button" variant="outline" className="rounded-[14px]">
+                    Get Letter of Authorisation
+                  </Button>
+
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-[14px]"
+                      onClick={() => {
+                        const chosenKeys = Object.entries(selectedSections)
+                          .filter(([, value]) => value)
+                          .map(([key]) => key);
+
+                        const chosen = chosenKeys.length
+                          ? visibleSections.filter((section) => chosenKeys.includes(section.key))
+                          : visibleSections;
+
+                        const text = chosen
+                          .map((section) => {
+                            const rows = section.rows.map((row) => `${row.label}: ${row.value}`).join("\n");
+                            return `${section.label}\n${rows}`;
+                          })
+                          .join("\n\n");
+
+                        try {
+                          const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+                          const url = URL.createObjectURL(blob);
+                          const anchor = document.createElement("a");
+                          anchor.href = url;
+                          anchor.download = `bank-transfer-details-${invoice.id}.txt`;
+                          document.body.appendChild(anchor);
+                          anchor.click();
+                          anchor.remove();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          toast.error("Download failed");
+                        }
+                      }}
+                      disabled={visibleSections.length === 0}
+                    >
+                      Download Selected
+                    </Button>
+                    <Button
+                      type="button"
+                      className="rounded-[14px]"
+                      onClick={async () => {
+                        const chosenKeys = Object.entries(selectedSections)
+                          .filter(([, value]) => value)
+                          .map(([key]) => key);
+
+                        const chosen = chosenKeys.length
+                          ? visibleSections.filter((section) => chosenKeys.includes(section.key))
+                          : visibleSections;
+
+                        const text = chosen
+                          .map((section) => {
+                            const rows = section.rows.map((row) => `${row.label}: ${row.value}`).join("\n");
+                            return `${section.label}\n${rows}`;
+                          })
+                          .join("\n\n");
+
+                        try {
+                          await navigator.clipboard.writeText(text);
+                          toast.success("Copied");
+                        } catch {
+                          toast.error("Copy failed");
+                        }
+                      }}
+                      disabled={visibleSections.length === 0}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <SectionCard className="space-y-5">
             <div className="flex items-center gap-6 border-b border-black/8 pb-3">
