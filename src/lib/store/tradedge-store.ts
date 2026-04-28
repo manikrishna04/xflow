@@ -16,6 +16,7 @@ type TradEdgeStore = {
   clearWorkspace: () => void;
   removeInvoice: (invoiceId: string) => void;
   setExporter: (exporter: ExporterProfile | null) => void;
+  setPartners: (partners: PartnerRecord[]) => void;
   signIn: (email: string) => void;
   signOut: () => void;
   upsertInvoice: (invoice: InvoiceRecord) => void;
@@ -60,6 +61,7 @@ export const useTradEdgeStore = create<TradEdgeStore>()(
           invoices: state.invoices.filter((invoice) => invoice.id !== invoiceId),
         })),
       setExporter: (exporter) => set(() => ({ exporter })),
+      setPartners: (partners) => set(() => ({ partners: sortPartners(partners) })),
       signIn: (accountId) =>
         set(() => ({
           session: {

@@ -37,6 +37,7 @@ import {
 } from "@/lib/tradedge/partners";
 import { receivableFormSchema } from "@/lib/tradedge/schemas";
 import { formatConnectedUserStatus, isConnectedUserActive } from "@/lib/tradedge/onboarding";
+import { formatStatusLabel } from "@/lib/tradedge/format";
 import { useTradEdgeStore } from "@/lib/store/tradedge-store";
 import type { XflowFile } from "@/types/xflow";
 
@@ -265,7 +266,7 @@ export function ReceivableCreateScreen() {
                   <option value="">Select...</option>
                   {directory.map((entry) => (
                     <option key={entry.id} value={entry.id}>
-                      {getPartnerLegalName(entry.partner)} ({entry.partner.status || "unknown"})
+                      {getPartnerLegalName(entry.partner)} ({formatStatusLabel(entry.partner.status)})
                     </option>
                   ))}
                 </Select>
@@ -568,7 +569,7 @@ export function ReceivableCreateScreen() {
 
                 {!partnerIsReady ? (
                   <p className="rounded-2xl bg-[rgba(255,167,38,0.12)] px-4 py-3 text-sm text-[rgb(170,97,23)]">
-                    This partner is still {selectedPartner.partner.status || "pending"}.
+                    This partner is still {formatStatusLabel(selectedPartner.partner.status) || "pending"}.
                     Creating a receivable now can leave it in draft.
                   </p>
                 ) : null}

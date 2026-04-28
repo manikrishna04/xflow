@@ -17,13 +17,37 @@ import {
   getPartnerEmail,
   getPartnerLegalName,
 } from "@/lib/tradedge/partners";
+import { usePartnersSyncQuery } from "@/lib/hooks/use-tradedge-actions";
 import { useTradEdgeStore } from "@/lib/store/tradedge-store";
 
 export function PartnerListScreen() {
+  const exporter = useTradEdgeStore((state) => state.exporter);
   const invoices = useTradEdgeStore((state) => state.invoices);
   const partners = useTradEdgeStore((state) => state.partners);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
+
+  // Refresh partner snapshots from Xflow so status doesn't stay stale in persisted localStorage.
+  usePartnersSyncQuery({
+    enabled: Boolean(exporter?.accountId),
+    accountId: exporter?.accountId ?? null,
+  });
+  
+  // 🔥 PRINT RAW PARTNER DATA FROM STORE
+  console.log("📋 PARTNERS LIST - RAW DATA FROM STORE:", JSON.stringify(partners, null, 2));
+  console.log("📊 PARTNERS COUNT:", partners.length);
+  partners.forEach((partner, index) => {
+    console.log(`  Partner ${index + 1}:`, {
+      id: partner.id,
+      legalName: partner.snapshot?.business_details?.legal_name,
+      email: partner.snapshot?.business_details?.email,
+      status: partner.snapshot?.status,
+      createdAt: partner.createdAt,
+      updatedAt: partner.updatedAt,
+      activationWarning: partner.activationWarning,
+    });
+  });
+  
   const directory = buildPartnerDirectory(partners, invoices);
 
   const filteredPartners = directory.filter((entry) => {

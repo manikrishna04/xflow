@@ -65,6 +65,10 @@ export function formatStatusLabel(status?: string | null) {
     return "Not started";
   }
 
+  if (status.toLowerCase() === "verifying") {
+    return "Verified";
+  }
+
   return status
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());

@@ -7,7 +7,7 @@ function parseAmount(value?: string | null) {
 }
 
 export function isPartnerActive(status?: string | null) {
-  return ["active", "activated"].includes((status || "").toLowerCase());
+  return ["active", "activated", "verifying"].includes((status || "").toLowerCase());
 }
 
 export function getPartnerLegalName(partner?: XflowAccount | null) {
